@@ -21,7 +21,8 @@ export const AGENTS: AgentMeta[] = [
     id: "analyst",
     label: "Critical Analysis",
     short: "Analyse",
-    description: "Summarises evidence, flags contradictions, scores credibility and finds gaps — looping back if needed.",
+    description:
+      "Summarises evidence, flags contradictions, scores credibility and finds gaps — looping back if needed.",
     icon: Scale,
   },
   {

@@ -44,7 +44,10 @@ export function extractToc(md: string): TocEntry[] {
   return md.split("\n").flatMap((line): TocEntry[] => {
     const m = line.match(/^(#{2,3})\s+(.+?)\s*$/);
     if (!m) return [];
-    const text = m[2].replace(/\[(\d+)\]/g, "").replace(/[*_`]/g, "").trim();
+    const text = m[2]
+      .replace(/\[(\d+)\]/g, "")
+      .replace(/[*_`]/g, "")
+      .trim();
     return [{ level: m[1].length as 2 | 3, text, id: headingId(text) }];
   });
 }

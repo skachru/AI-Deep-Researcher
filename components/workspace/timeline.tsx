@@ -125,10 +125,16 @@ export function Timeline({ items, running }: { items: ActivityItem[]; running: b
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
-                    <span className="shrink-0 text-[11px] font-medium tracking-wide text-subtle uppercase">{agentLabel}</span>
-                    <span className="ml-auto shrink-0 text-[11px] text-subtle tabular-nums">{relativeTime(item.at, now)}</span>
+                    <span className="shrink-0 text-[11px] font-medium tracking-wide text-subtle uppercase">
+                      {agentLabel}
+                    </span>
+                    <span className="ml-auto shrink-0 text-[11px] text-subtle tabular-nums">
+                      {relativeTime(item.at, now)}
+                    </span>
                   </div>
-                  <p className={cn("text-[13px] leading-snug break-words", emphasis ? "text-foreground" : "text-muted")}>
+                  <p
+                    className={cn("text-[13px] leading-snug break-words", emphasis ? "text-foreground" : "text-muted")}
+                  >
                     {item.message}
                   </p>
                 </div>

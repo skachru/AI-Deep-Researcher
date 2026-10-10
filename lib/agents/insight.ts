@@ -21,7 +21,10 @@ export function renderFindings(findings: Finding[], contradictions: Contradictio
     )
     .join("\n\n");
   const c = contradictions
-    .map((x) => `- ${x.topic}: "${x.claimA.text}" (${x.claimA.sourceId}) vs "${x.claimB.text}" (${x.claimB.sourceId}). ${x.assessment}`)
+    .map(
+      (x) =>
+        `- ${x.topic}: "${x.claimA.text}" (${x.claimA.sourceId}) vs "${x.claimB.text}" (${x.claimB.sourceId}). ${x.assessment}`,
+    )
     .join("\n");
   return `## Findings\n${f || "(none)"}\n\n## Contradictions\n${c || "(none)"}`;
 }

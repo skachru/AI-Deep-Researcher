@@ -42,7 +42,9 @@ function describe(e: ResearchEvent): string {
 async function main() {
   const args = process.argv.slice(2);
   const depth = args.includes("--standard") ? "standard" : "quick";
-  const query = args.filter((a) => !a.startsWith("--")).join(" ") || "Do AI coding assistants actually improve developer productivity?";
+  const query =
+    args.filter((a) => !a.startsWith("--")).join(" ") ||
+    "Do AI coding assistants actually improve developer productivity?";
   const started = Date.now();
   for await (const event of runResearch({ query, depth })) console.log(describe(event));
   console.log(`Done in ${((Date.now() - started) / 1000).toFixed(1)}s`);

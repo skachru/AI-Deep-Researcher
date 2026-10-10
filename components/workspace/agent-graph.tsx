@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Handle,
-  MarkerType,
-  Position,
-  ReactFlow,
-  type Edge,
-  type Node,
-  type NodeProps,
-} from "@xyflow/react";
+import { Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Check } from "lucide-react";
 import { memo, useMemo } from "react";
@@ -94,7 +86,14 @@ export function AgentGraph({ view }: { view: ResearchViewState }) {
         draggable: false,
         selectable: false,
       })),
-      { id: "spacer", type: "spacer", position: { x: 262, y: Y_GAP / 2 }, data: {}, draggable: false, selectable: false },
+      {
+        id: "spacer",
+        type: "spacer",
+        position: { x: 262, y: Y_GAP / 2 },
+        data: {},
+        draggable: false,
+        selectable: false,
+      },
     ],
     [view],
   );
@@ -132,7 +131,10 @@ export function AgentGraph({ view }: { view: ResearchViewState }) {
         labelStyle: { fontSize: 10.5, fill: view.passes > 1 ? "var(--accent)" : "var(--subtle)" },
         labelBgStyle: { fill: "var(--surface)" },
         ...edgeStyle(stateOf("analyst", "retriever")),
-        style: { ...edgeStyle(stateOf("analyst", "retriever")).style, strokeDasharray: view.passes > 1 ? undefined : "4 4" },
+        style: {
+          ...edgeStyle(stateOf("analyst", "retriever")).style,
+          strokeDasharray: view.passes > 1 ? undefined : "4 4",
+        },
       },
     ];
   }, [view.handoffs, view.activeAgent, view.passes]);

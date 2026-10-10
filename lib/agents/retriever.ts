@@ -60,7 +60,9 @@ export async function retrieverAgent(
   emit(config, {
     type: "agent_started",
     agent: "retriever",
-    message: isFollowUp ? "Running targeted follow-up retrieval for open gaps" : "Decomposing the query into sub-questions",
+    message: isFollowUp
+      ? "Running targeted follow-up retrieval for open gaps"
+      : "Decomposing the query into sub-questions",
   });
 
   // 1. Decide what to look for.
@@ -150,10 +152,14 @@ export async function retrieverAgent(
   for (const r of results) if (r.usage) usage = addUsage(usage, r.usage);
 
   // 3. Dedupe against what we already have, cap, and assign stable ids.
-  const room = isFollowUp
-    ? budget.maxSources - state.sources.length
-    : budget.maxSources - FOLLOW_UP_RESERVE;
-  const fresh = capSources(dedupeSources(results.flatMap((r) => r.sources), state.sources), Math.max(room, 0));
+  const room = isFollowUp ? budget.maxSources - state.sources.length : budget.maxSources - FOLLOW_UP_RESERVE;
+  const fresh = capSources(
+    dedupeSources(
+      results.flatMap((r) => r.sources),
+      state.sources,
+    ),
+    Math.max(room, 0),
+  );
   const newSources: Source[] = fresh.map((raw, i) => {
     const source: Source = {
       ...raw,
@@ -167,7 +173,9 @@ export async function retrieverAgent(
 
   if (state.sources.length + newSources.length === 0) {
     emit(config, { type: "error", message: "No sources could be retrieved for this query.", recoverable: true });
-    notes.push("No sources were retrieved; the report relies on model knowledge only and should be treated with caution.");
+    notes.push(
+      "No sources were retrieved; the report relies on model knowledge only and should be treated with caution.",
+    );
   }
 
   // 4. Chunk + BM25-rank evidence for each sub-question across all sources.

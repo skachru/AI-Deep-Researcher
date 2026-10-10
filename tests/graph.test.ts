@@ -57,7 +57,13 @@ vi.mock("@/lib/llm", async (importActual) => {
                 credibility: [{ sourceId: "S1", score: 90, rationale: "Peer reviewed" }],
                 gaps:
                   analysisCalls === 1
-                    ? [{ description: "No long-term data", importance: "high", followUpQuestion: "Long-term effects of AI assistants?" }]
+                    ? [
+                        {
+                          description: "No long-term data",
+                          importance: "high",
+                          followUpQuestion: "Long-term effects of AI assistants?",
+                        },
+                      ]
                     : [],
               },
             };
@@ -67,7 +73,13 @@ vi.mock("@/lib/llm", async (importActual) => {
               raw: usageMsg(),
               parsed: {
                 insights: [
-                  { title: "Gains concentrate in juniors", hypothesis: "h", confidence: "Medium", reasoning: ["a", "b"], evidenceIds: ["S1"] },
+                  {
+                    title: "Gains concentrate in juniors",
+                    hypothesis: "h",
+                    confidence: "Medium",
+                    reasoning: ["a", "b"],
+                    evidenceIds: ["S1"],
+                  },
                 ],
               },
             };
@@ -114,7 +126,9 @@ describe("research graph", () => {
     const events: ResearchEvent[] = [];
     for await (const e of runResearch({ query: "Do AI coding assistants help?", depth: "quick" })) events.push(e);
 
-    const order = events.filter((e) => e.type === "agent_started").map((e) => (e.type === "agent_started" ? e.agent : ""));
+    const order = events
+      .filter((e) => e.type === "agent_started")
+      .map((e) => (e.type === "agent_started" ? e.agent : ""));
     expect(order).toEqual(["retriever", "analyst", "retriever", "analyst", "insight", "reporter"]);
 
     expect(events.some((e) => e.type === "iteration_started" && e.iteration === 1)).toBe(true);

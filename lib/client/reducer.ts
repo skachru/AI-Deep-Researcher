@@ -163,10 +163,7 @@ export function applyEvent(state: ResearchViewState, e: ResearchEvent): Research
     case "contradiction_found":
       return {
         ...state,
-        contradictions: [
-          ...state.contradictions.filter((c) => c.topic !== e.contradiction.topic),
-          e.contradiction,
-        ],
+        contradictions: [...state.contradictions.filter((c) => c.topic !== e.contradiction.topic), e.contradiction],
         activity: log(state, {
           at: e.at,
           agent: "analyst",

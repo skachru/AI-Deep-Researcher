@@ -67,7 +67,11 @@ export function QueryForm() {
           className="block w-full resize-none bg-transparent px-4 pt-4 pb-2 text-[15px] leading-relaxed outline-none placeholder:text-subtle"
         />
         <div className="flex items-center justify-between gap-3 px-3 pb-3">
-          <div role="radiogroup" aria-label="Research depth" className="flex rounded-md border border-border bg-surface-muted p-0.5">
+          <div
+            role="radiogroup"
+            aria-label="Research depth"
+            className="flex rounded-md border border-border bg-surface-muted p-0.5"
+          >
             {(["quick", "standard"] as const).map((d) => (
               <button
                 key={d}

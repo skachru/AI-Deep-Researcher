@@ -6,12 +6,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  CredibilityBar,
-  domainOf,
-  SourceChip,
-  SourceTypeBadge,
-} from "@/components/workspace/source-pieces";
+import { CredibilityBar, domainOf, SourceChip, SourceTypeBadge } from "@/components/workspace/source-pieces";
 import type { ResearchViewState } from "@/lib/client/reducer";
 import type { Confidence, Insight, SourceSummary } from "@/lib/schemas/domain";
 import { cn } from "@/lib/utils";
@@ -121,7 +116,9 @@ function InsightCard({ insight, sources }: { insight: Insight; sources: SourceSu
           <div className="text-[13px] font-medium">{insight.title}</div>
           <p className="mt-1 text-[12.5px] leading-snug text-muted">{insight.hypothesis}</p>
         </div>
-        <ChevronDown className={cn("mt-1 size-4 shrink-0 text-subtle transition-transform duration-200", open && "rotate-180")} />
+        <ChevronDown
+          className={cn("mt-1 size-4 shrink-0 text-subtle transition-transform duration-200", open && "rotate-180")}
+        />
       </button>
       <AnimatePresence initial={false}>
         {open && (
@@ -144,7 +141,10 @@ function InsightCard({ insight, sources }: { insight: Insight; sources: SourceSu
             </ol>
             {insight.evidenceIds.length > 0 && (
               <div className="flex flex-wrap items-center gap-1 px-3 pb-3 text-[11.5px] text-subtle">
-                Evidence: {insight.evidenceIds.map((id) => <SourceChip key={id} id={id} sources={sources} />)}
+                Evidence:{" "}
+                {insight.evidenceIds.map((id) => (
+                  <SourceChip key={id} id={id} sources={sources} />
+                ))}
               </div>
             )}
           </motion.div>
@@ -171,7 +171,11 @@ export function SideTabs({ view }: { view: ResearchViewState }) {
       </TabsList>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <TabsContent value="sources">
-          {view.sources.length ? <SourcesList sources={view.sources} /> : <Empty running={running} label="No sources yet." />}
+          {view.sources.length ? (
+            <SourcesList sources={view.sources} />
+          ) : (
+            <Empty running={running} label="No sources yet." />
+          )}
         </TabsContent>
         <TabsContent value="contradictions">
           {view.contradictions.length ? (
@@ -179,7 +183,11 @@ export function SideTabs({ view }: { view: ResearchViewState }) {
           ) : (
             <Empty
               running={running && view.agents.analyst !== "done"}
-              label={view.agents.analyst === "done" ? "No contradictions found between sources." : "Contradictions appear after analysis."}
+              label={
+                view.agents.analyst === "done"
+                  ? "No contradictions found between sources."
+                  : "Contradictions appear after analysis."
+              }
             />
           )}
         </TabsContent>

@@ -103,7 +103,8 @@ export function useResearch() {
         }
         if (!finished && !failure) failure = "The research stream ended unexpectedly.";
       } catch (err) {
-        const timedOut = controller.signal.reason instanceof DOMException && controller.signal.reason.name === "TimeoutError";
+        const timedOut =
+          controller.signal.reason instanceof DOMException && controller.signal.reason.name === "TimeoutError";
         if (controller.signal.aborted && !timedOut) return; // user navigated away or started another run
         failure = timedOut ? "The live run timed out." : err instanceof Error ? err.message : String(err);
       } finally {

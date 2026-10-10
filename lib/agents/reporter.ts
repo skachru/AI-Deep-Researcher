@@ -22,12 +22,17 @@ Rules:
 
 export function renderInsights(insights: Insight[]): string {
   return insights
-    .map((i) => `- ${i.title} [${i.confidence}]: ${i.hypothesis}\n  Reasoning: ${i.reasoning.join(" → ")}\n  Sources: ${i.evidenceIds.join(", ")}`)
+    .map(
+      (i) =>
+        `- ${i.title} [${i.confidence}]: ${i.hypothesis}\n  Reasoning: ${i.reasoning.join(" → ")}\n  Sources: ${i.evidenceIds.join(", ")}`,
+    )
     .join("\n");
 }
 
 /** Deterministic Methodology section. Pure. */
-export function buildMethodology(state: Pick<ResearchStateType, "sources" | "subQuestions" | "evidence" | "iteration" | "notes" | "depth">): string {
+export function buildMethodology(
+  state: Pick<ResearchStateType, "sources" | "subQuestions" | "evidence" | "iteration" | "notes" | "depth">,
+): string {
   const byType = (t: Source["type"]) => state.sources.filter((s) => s.type === t).length;
   const lines = [
     "## Methodology",

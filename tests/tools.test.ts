@@ -42,7 +42,9 @@ describe("arXiv parser", () => {
   });
 
   it("builds an AND query from sanitised keywords", () => {
-    expect(buildArxivUrl("AI coding: productivity!", 3)).toContain("search_query=all:AI+AND+all:coding+AND+all:productivity");
+    expect(buildArxivUrl("AI coding: productivity!", 3)).toContain(
+      "search_query=all:AI+AND+all:coding+AND+all:productivity",
+    );
   });
 
   it("fetches through the network layer (mocked)", async () => {
@@ -81,7 +83,8 @@ describe("Wikipedia parsers", () => {
   it("searches end to end with mocked fetch", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
-      if (url.includes("/search/page")) return Response.json({ pages: [{ key: "Nuclear_power", title: "Nuclear power" }] });
+      if (url.includes("/search/page"))
+        return Response.json({ pages: [{ key: "Nuclear_power", title: "Nuclear power" }] });
       if (url.includes("/page/summary/")) return Response.json(summary);
       return Response.json({ query: { pages: { "1": { extract: "Long text" } } } });
     });
@@ -99,7 +102,12 @@ describe("web search block parser", () => {
       type: "web_search_tool_result",
       tool_use_id: "x",
       content: [
-        { type: "web_search_result", url: "https://github.blog/study", title: "Copilot study", page_age: "March 3, 2025" },
+        {
+          type: "web_search_result",
+          url: "https://github.blog/study",
+          title: "Copilot study",
+          page_age: "March 3, 2025",
+        },
         { type: "web_search_result", url: "https://news.example.com/a", title: "News A", page_age: "2 days ago" },
       ],
     },
@@ -107,10 +115,18 @@ describe("web search block parser", () => {
       type: "text",
       text: "Developers completed tasks 55% faster.",
       citations: [
-        { type: "web_search_result_location", url: "https://github.blog/study", title: "Copilot study", cited_text: "55% faster" },
+        {
+          type: "web_search_result_location",
+          url: "https://github.blog/study",
+          title: "Copilot study",
+          cited_text: "55% faster",
+        },
       ],
     },
-    { type: "web_search_tool_result", content: { type: "web_search_tool_result_error", error_code: "max_uses_exceeded" } },
+    {
+      type: "web_search_tool_result",
+      content: { type: "web_search_tool_result_error", error_code: "max_uses_exceeded" },
+    },
   ];
 
   it("extracts results with cited passages and normalised dates", () => {
@@ -146,7 +162,11 @@ describe("chunking, dedupe and capping", () => {
   it("dedupes by normalised URL and title, including against existing sources", () => {
     expect(normaliseUrl("https://www.Example.com/a/?utm_source=x#top")).toBe("example.com/a");
     const out = dedupeSources(
-      [raw({ url: "https://example.com/a" }), raw({ url: "https://www.example.com/a/", title: "other" }), raw({ url: "https://b.com", title: "B" })],
+      [
+        raw({ url: "https://example.com/a" }),
+        raw({ url: "https://www.example.com/a/", title: "other" }),
+        raw({ url: "https://b.com", title: "B" }),
+      ],
       [{ url: "https://b.com/", title: "Different" }],
     );
     expect(out.map((s) => s.url)).toEqual(["https://example.com/a"]);
@@ -166,7 +186,10 @@ describe("chunking, dedupe and capping", () => {
 describe("credibility", () => {
   const now = new Date("2026-10-10");
   it("rewards papers, trusted domains and recency", () => {
-    const paper = heuristicCredibility({ type: "paper", url: "https://arxiv.org/abs/1", publishedDate: "2026-01-01" }, now);
+    const paper = heuristicCredibility(
+      { type: "paper", url: "https://arxiv.org/abs/1", publishedDate: "2026-01-01" },
+      now,
+    );
     const blog = heuristicCredibility({ type: "web", url: "https://random.blog/x", publishedDate: "2010-01-01" }, now);
     expect(paper).toBeGreaterThan(blog);
     expect(paper).toBeLessThanOrEqual(100);

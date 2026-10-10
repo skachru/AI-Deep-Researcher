@@ -2,7 +2,19 @@ import type { Source, SourceType } from "@/lib/schemas/domain";
 
 const TYPE_PRIOR: Record<SourceType, number> = { paper: 75, wiki: 60, news: 55, web: 50 };
 
-const HIGH_TRUST_DOMAINS = [/\.gov(\.|$)/, /\.edu(\.|$)/, /\.ac\.[a-z]{2}$/, /(^|\.)who\.int$/, /(^|\.)oecd\.org$/, /(^|\.)iea\.org$/, /(^|\.)ipcc\.ch$/, /(^|\.)nature\.com$/, /(^|\.)science\.org$/, /(^|\.)nber\.org$/, /(^|\.)arxiv\.org$/];
+const HIGH_TRUST_DOMAINS = [
+  /\.gov(\.|$)/,
+  /\.edu(\.|$)/,
+  /\.ac\.[a-z]{2}$/,
+  /(^|\.)who\.int$/,
+  /(^|\.)oecd\.org$/,
+  /(^|\.)iea\.org$/,
+  /(^|\.)ipcc\.ch$/,
+  /(^|\.)nature\.com$/,
+  /(^|\.)science\.org$/,
+  /(^|\.)nber\.org$/,
+  /(^|\.)arxiv\.org$/,
+];
 
 export const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Math.round(n)));
 
@@ -10,10 +22,7 @@ export const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, 
  * Retrieval-time credibility prior from source type, domain and recency. Pure.
  * The Critical Analysis agent later blends in its own judgement and corroboration.
  */
-export function heuristicCredibility(
-  source: Pick<Source, "type" | "url" | "publishedDate">,
-  now = new Date(),
-): number {
+export function heuristicCredibility(source: Pick<Source, "type" | "url" | "publishedDate">, now = new Date()): number {
   let score = TYPE_PRIOR[source.type];
   try {
     const host = new URL(source.url).host;

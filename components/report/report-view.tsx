@@ -55,10 +55,17 @@ function Citation({ n, source }: { n: string; source?: SourceSummary }) {
           <span className="truncate">{domainOf(source.url)}</span>
           {source.publishedDate && <span className="ml-auto tabular-nums">{source.publishedDate}</span>}
         </div>
-        <a href={source.url} target="_blank" rel="noreferrer" className="mt-1.5 block font-medium leading-snug hover:text-accent">
+        <a
+          href={source.url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1.5 block font-medium leading-snug hover:text-accent"
+        >
           {source.title}
         </a>
-        {source.snippet && <p className="mt-1.5 line-clamp-4 text-[12.5px] leading-snug text-muted">{source.snippet}</p>}
+        {source.snippet && (
+          <p className="mt-1.5 line-clamp-4 text-[12.5px] leading-snug text-muted">{source.snippet}</p>
+        )}
         <CredibilityBar value={source.credibility} className="mt-2.5" />
       </HoverCardContent>
     </HoverCard>
@@ -71,7 +78,9 @@ function useActiveHeading(ids: string[]) {
     const els = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => el !== null);
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (visible[0]) setActive(visible[0].target.id);
       },
       { rootMargin: "-80px 0px -65% 0px" },
@@ -152,7 +161,9 @@ export function ReportView({ report, sources, query }: { report: string; sources
                   className={cn(
                     "-ml-px block border-l py-1 text-[12.5px] leading-snug transition-colors duration-150",
                     t.level === 3 ? "pl-6" : "pl-3",
-                    active === t.id ? "border-accent text-foreground" : "border-transparent text-muted hover:text-foreground",
+                    active === t.id
+                      ? "border-accent text-foreground"
+                      : "border-transparent text-muted hover:text-foreground",
                   )}
                 >
                   {t.text}

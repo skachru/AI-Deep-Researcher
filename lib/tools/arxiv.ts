@@ -2,7 +2,6 @@ import { XMLParser } from "fast-xml-parser";
 import { fetchWithRetry } from "@/lib/tools/http";
 import type { RawSource } from "@/lib/tools/types";
 
-
 const ARXIV_ENDPOINT = "https://export.arxiv.org/api/query";
 
 export function buildArxivUrl(query: string, maxResults: number): string {

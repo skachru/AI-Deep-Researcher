@@ -7,7 +7,10 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex h-10 items-center justify-between gap-2 border-b border-border px-3.5 text-[13px] font-medium", className)}
+      className={cn(
+        "flex h-10 items-center justify-between gap-2 border-b border-border px-3.5 text-[13px] font-medium",
+        className,
+      )}
       {...props}
     />
   );

@@ -12,6 +12,9 @@ export const dynamic = "force-dynamic";
  */
 export const maxDuration = 300;
 
+/** Abort the graph a little before the platform limit so the client gets a clean error event. */
+const RUN_DEADLINE_MS = (maxDuration - 15) * 1000;
+
 const BodySchema = z.object({
   query: z.string().trim().min(8, "Please ask a fuller question").max(500),
   depth: z.enum(["quick", "standard"]).default("quick"),
@@ -37,7 +40,8 @@ export async function POST(request: Request): Promise<Response> {
       // Heartbeat comments keep proxies from closing an idle connection while an agent thinks.
       const heartbeat = setInterval(() => controller.enqueue(encoder.encode(": ping\n\n")), 15_000);
       try {
-        for await (const event of runResearch({ query, depth, signal: request.signal })) {
+        const signal = AbortSignal.any([request.signal, AbortSignal.timeout(RUN_DEADLINE_MS)]);
+        for await (const event of runResearch({ query, depth, signal })) {
           controller.enqueue(encoder.encode(encodeSse(event)));
         }
       } catch (err) {
@@ -45,7 +49,11 @@ export async function POST(request: Request): Promise<Response> {
         controller.enqueue(encoder.encode(encodeSse(stamp({ type: "error", message, recoverable: false }))));
       } finally {
         clearInterval(heartbeat);
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Client already disconnected.
+        }
       }
     },
   });

@@ -90,11 +90,7 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
           </div>
           <Stat icon={Clock} label="Elapsed" value={formatDuration(elapsed)} />
           <Stat icon={Library} label="Sources" value={String(state.sources.length)} />
-          <Stat
-            icon={Coins}
-            label="Tokens"
-            value={formatTokens(state.usage.inputTokens + state.usage.outputTokens)}
-          />
+          <Stat icon={Coins} label="Tokens" value={formatTokens(state.usage.inputTokens + state.usage.outputTokens)} />
           <div className="flex items-center gap-2">
             {view === "report" ? (
               <Button size="sm" onClick={() => setView("workspace")}>
@@ -111,7 +107,10 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
 
       {state.status === "error" && (
         <div className="mx-auto max-w-[1440px] px-4 pt-4">
-          <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3">
+          <div
+            role="alert"
+            className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3"
+          >
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" />
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-medium text-danger">The research run failed</div>
@@ -126,7 +125,13 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
 
       <AnimatePresence mode="wait" initial={false}>
         {view === "report" && state.report ? (
-          <motion.div key="report" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          <motion.div
+            key="report"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
             <ReportView report={state.report} sources={state.sources} query={query} />
           </motion.div>
         ) : (
@@ -150,7 +155,9 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
               </div>
               {state.subQuestions.length > 0 && (
                 <div className="border-t border-border px-3.5 py-3">
-                  <div className="mb-1.5 text-[11px] font-medium tracking-wide text-subtle uppercase">Sub-questions</div>
+                  <div className="mb-1.5 text-[11px] font-medium tracking-wide text-subtle uppercase">
+                    Sub-questions
+                  </div>
                   <ol className="max-h-40 space-y-1 overflow-y-auto">
                     {state.subQuestions.map((q) => (
                       <li key={q.id} className="flex gap-1.5 text-[12px] leading-snug text-muted">

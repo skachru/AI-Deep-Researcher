@@ -22,7 +22,10 @@ export function CredibilityBar({ value, className }: { value: number; className?
   return (
     <div className={cn("flex items-center gap-2", className)} title={`Credibility ${value}/100`}>
       <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-muted">
-        <div className={cn("h-full rounded-full transition-[width] duration-300", tone)} style={{ width: `${value}%` }} />
+        <div
+          className={cn("h-full rounded-full transition-[width] duration-300", tone)}
+          style={{ width: `${value}%` }}
+        />
       </div>
       <span className="w-6 text-right text-[11px] text-muted tabular-nums">{value}</span>
     </div>

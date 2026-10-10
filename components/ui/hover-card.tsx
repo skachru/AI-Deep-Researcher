@@ -11,7 +11,10 @@ export function HoverCardContent({ className, ...props }: React.ComponentProps<t
     <HoverCardPrimitive.Portal>
       <HoverCardPrimitive.Content
         sideOffset={6}
-        className={cn("z-50 w-80 rounded-lg border border-border bg-surface p-3.5 text-[13px] shadow-pop outline-none", className)}
+        className={cn(
+          "z-50 w-80 rounded-lg border border-border bg-surface p-3.5 text-[13px] shadow-pop outline-none",
+          className,
+        )}
         {...props}
       />
     </HoverCardPrimitive.Portal>

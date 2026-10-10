@@ -36,7 +36,9 @@ async function record(query: string, depth: Depth): Promise<boolean> {
   mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${slugify(query)}.json`);
   writeFileSync(file, JSON.stringify(recording));
-  console.log(`\n  ✓ ${events.length} events in ${((Date.now() - started) / 1000).toFixed(0)}s → ${path.relative(process.cwd(), file)}`);
+  console.log(
+    `\n  ✓ ${events.length} events in ${((Date.now() - started) / 1000).toFixed(0)}s → ${path.relative(process.cwd(), file)}`,
+  );
   return true;
 }
 
