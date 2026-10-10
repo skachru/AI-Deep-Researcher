@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useReducer, useRef, useState } from "react";
 import { applyEvent, initialViewState, type ResearchViewState } from "@/lib/client/reducer";
 import { isResearchEvent } from "@/lib/events/emit";
 import { createSseParser } from "@/lib/events/sse";
@@ -46,8 +46,6 @@ export function useResearch() {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
   }, []);
-
-  useEffect(() => stop, [stop]);
 
   const replay = useCallback(
     (events: ResearchEvent[]) => {

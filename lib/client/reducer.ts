@@ -201,7 +201,6 @@ export function applyEvent(state: ResearchViewState, e: ResearchEvent): Research
         report: e.report,
         sources: e.sources,
         finishedAt: e.at,
-        activity: log(state, { at: e.at, agent: "reporter", kind: "info", message: "Report ready" }),
       };
 
     case "usage":
