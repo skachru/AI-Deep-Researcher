@@ -41,12 +41,12 @@ flowchart TD
 
 ## The four agents
 
-| Agent | File | What it does |
-| --- | --- | --- |
+| Agent                | File                      | What it does                                                                                                                                                                                                                                                                                                                                      |
+| -------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Contextual Retriever | `lib/agents/retriever.ts` | Splits the query into 3–5 sub-questions; runs Claude web search (`web_search_20260209`), a news-focused search, arXiv and Wikipedia in parallel; dedupes, caps sources (~12–15) with a balanced mix, chunks text and ranks chunks per sub-question with LangChain's `BM25Retriever`. On the follow-up pass it turns gaps into targeted questions. |
-| Critical Analysis | `lib/agents/analyst.ts` | Summarises evidence per sub-question, labels claims Corroborated / Single-source / Disputed, flags contradictions (both claims and source ids), scores credibility (type, domain, recency, model judgement, corroboration) and lists gaps by importance. |
-| Insight Generation | `lib/agents/insight.ts` | Reasons step by step to produce 3–5 hypotheses with High/Medium/Low confidence, the reasoning chain and evidence ids. |
-| Report Builder | `lib/agents/reporter.ts` | Writes Executive Summary, Key Findings, Contradictions & Open Questions, Insights & Hypotheses with `[n]` citations; Methodology (including failed sources) and References are generated deterministically. |
+| Critical Analysis    | `lib/agents/analyst.ts`   | Summarises evidence per sub-question, labels claims Corroborated / Single-source / Disputed, flags contradictions (both claims and source ids), scores credibility (type, domain, recency, model judgement, corroboration) and lists gaps by importance.                                                                                          |
+| Insight Generation   | `lib/agents/insight.ts`   | Reasons step by step to produce 3–5 hypotheses with High/Medium/Low confidence, the reasoning chain and evidence ids.                                                                                                                                                                                                                             |
+| Report Builder       | `lib/agents/reporter.ts`  | Writes Executive Summary, Key Findings, Contradictions & Open Questions, Insights & Hypotheses with `[n]` citations; Methodology (including failed sources) and References are generated deterministically.                                                                                                                                       |
 
 ## Setup
 
@@ -59,20 +59,20 @@ npm run dev                   # http://localhost:3000
 
 Other scripts:
 
-| Command | Purpose |
-| --- | --- |
-| `npm run research -- "question" [--standard]` | Run the graph from the terminal and print every event |
-| `npm run record [-- "question"]` | Record full runs to `public/demo/<slug>.json` (all three examples by default) |
-| `npm test` | Vitest: routing logic, tool parsers (mocked network), reducer, report helpers, end-to-end graph with mocked LLM |
-| `npm run lint` · `npm run typecheck` · `npm run format` | Code quality |
+| Command                                                 | Purpose                                                                                                         |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `npm run research -- "question" [--standard]`           | Run the graph from the terminal and print every event                                                           |
+| `npm run record [-- "question"]`                        | Record full runs to `public/demo/<slug>.json` (all three examples by default)                                   |
+| `npm test`                                              | Vitest: routing logic, tool parsers (mocked network), reducer, report helpers, end-to-end graph with mocked LLM |
+| `npm run lint` · `npm run typecheck` · `npm run format` | Code quality                                                                                                    |
 
 ## Environment variables
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Yes | The only key needed. arXiv and Wikipedia are free; web search runs through Claude. Web search must be enabled for your organisation in the Claude Console. |
-| `LUMEN_MODEL` | No | Defaults to `claude-opus-5-5`. |
-| `NEXT_PUBLIC_DEMO_MODE` | No | `true` makes the example chips replay recorded runs instantly. |
+| Variable                | Required | Description                                                                                                                                                |
+| ----------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`     | Yes      | The only key needed. arXiv and Wikipedia are free; web search runs through Claude. Web search must be enabled for your organisation in the Claude Console. |
+| `LUMEN_MODEL`           | No       | Defaults to `claude-opus-5-5`.                                                                                                                             |
+| `NEXT_PUBLIC_DEMO_MODE` | No       | `true` makes the example chips replay recorded runs instantly.                                                                                             |
 
 Variables are validated with Zod on first use (`lib/env.ts`), so a missing key produces a clear error instead of a crash.
 
