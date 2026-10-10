@@ -46,7 +46,7 @@ flowchart TD
 | Contextual Retriever | `lib/agents/retriever.ts` | Splits the query into 3–5 sub-questions; runs OpenRouter web search (the `openrouter:web_search` server tool), a news-focused search, arXiv and Wikipedia in parallel; dedupes, caps sources (~12–15) with a balanced mix, chunks text and ranks chunks per sub-question with LangChain's `BM25Retriever`. On the follow-up pass it turns gaps into targeted questions. |
 | Critical Analysis    | `lib/agents/analyst.ts`   | Summarises evidence per sub-question, labels claims Corroborated / Single-source / Disputed, flags contradictions (both claims and source ids), scores credibility (type, domain, recency, model judgement, corroboration) and lists gaps by importance.                                                                                                                |
 | Insight Generation   | `lib/agents/insight.ts`   | Reasons step by step to produce 3–5 hypotheses with High/Medium/Low confidence, the reasoning chain and evidence ids.                                                                                                                                                                                                                                                   |
-| Report Builder       | `lib/agents/reporter.ts`  | Writes Executive Summary, Key Findings, Contradictions & Open Questions, Insights & Hypotheses with `[n]` citations; Methodology (including failed sources) and References are generated deterministically.                                                                                                                                                             |
+| Report Builder       | `lib/agents/reporter.ts`  | Writes Summary, Key Findings, Contradictions & Open Questions, Insights & Hypotheses with `[n]` citations; Methodology (including failed sources) and References are generated deterministically.                                                                                                                                                                       |
 
 ## Setup
 
@@ -80,14 +80,16 @@ Other scripts:
 | `APP_URL`                                                    | No                 | Pins the public URL used for the Google redirect (otherwise taken from the request).                                                                                                         |
 | `ADMIN_EMAILS`                                               | No                 | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                                                               |
 | `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email          | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).                                                 |
-| `RUNS_PER_HOUR`                                              | No                 | Research runs allowed per visitor per hour (default 10; admins exempt).                                                                                                                      |
+| `RUNS_PER_HOUR` `RUNS_PER_IP_HOUR` `RUNS_PER_DAY`            | No                 | Research limits: per visitor per hour (10), per IP per hour (20), whole site per day (300). Admins are exempt.                                                                               |
+| `EMAILS_PER_DAY` `EMAILS_PER_IP_DAY` `EMAILS_GLOBAL_DAY`     | No                 | Email limits: per visitor (10), per IP (20), whole site (200) per day.                                                                                                                       |
 
 Variables are validated with Zod on first use (`lib/env.ts`), so a missing key produces a clear error instead of a crash.
 
 ## Accounts, history, email and admin
 
-- **Quick summary in seconds:** a `quick_summary` branch fans out from `START` in parallel with the Retriever and streams a
-  short preliminary answer token by token. When the report is ready it is replaced by the source-verified `## Summary`.
+- **Quick summary in seconds:** `lib/graph/run.ts` streams a short preliminary answer token by token _alongside_ the
+  LangGraph run (not as a node, so it can never delay the agents). When the report is ready it is replaced by the
+  source-verified `## Summary`.
 - **History:** every browser gets an anonymous id (httpOnly cookie), so `/history` works without sign-up. Signing in with
   **Google** (OAuth code flow with PKCE; ID token verified against Google's keys) or an emailed one-time link attaches
   that history to the account and syncs it across devices.
@@ -97,11 +99,18 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
 - **Downloads:** PDF, HTML and Markdown from the report view (`POST /api/export`; the PDF is rendered server-side with
   pdfmake, and the HTML is sanitised because report text derives from web content).
 - **Email:** after each report the user is asked for their email; `POST /api/email` sends the report as HTML with the PDF
-  attached (10 emails per browser per day).
+  attached (rate-limited per user, per IP and overall).
 - **Admin:** `/admin` (only for `ADMIN_EMAILS`) shows searches, success rate, users, average run time, tokens, emails sent,
   searches per day, top questions and recent searches.
 
 Each feature switches on when its environment variables are set; without them the app still runs research.
+
+**Safety and cost controls.** Research, email, export, sign-in and preview-image requests are rate-limited per visitor,
+per IP and (for paid operations) site-wide. Limits use an atomic Postgres counter (`rate_limits` table) and fall back to
+an in-memory counter when no database is configured or it is unreachable — they are never switched off. Report claims
+are re-labelled from the validated evidence ("Corroborated" needs two different sites), citations to non-existent
+sources are removed, post-sign-in redirects only allow same-site paths, and the preview-image fetcher pins every
+connection to an address it has verified is public (no private-network access, including via DNS rebinding).
 
 **Setup check:** open `/setup` on your deployment. Its **speed test** times one structured call and one web search with your model, so you can tell at once whether a model is fast enough. It tests the OpenRouter key (and remaining credit), the chosen model's capabilities, the Google OAuth client ID/secret and
 redirect URI (against Google itself), the database and SMTP login, and says exactly what to fix. No secrets are shown;

@@ -133,3 +133,40 @@ describe("run recorder (what history saves)", () => {
     expect(s.quickSummaryStatus).toBe("streaming");
   });
 });
+
+describe("reducer robustness", () => {
+  it("clears first-pass findings and contradictions when analysis re-runs", () => {
+    const s = [
+      { type: "run_started", query: "q?", depth: "standard", at: 0 },
+      { type: "agent_started", agent: "analyst", message: "1", at: 1 },
+      {
+        type: "contradiction_found",
+        contradiction: {
+          topic: "T",
+          claimA: { text: "a", sourceId: "S1" },
+          claimB: { text: "b", sourceId: "S2" },
+          assessment: "",
+        },
+        at: 2,
+      },
+      { type: "finding_added", finding: { subQuestionId: "Q1", question: "q", summary: "s", claims: [] }, at: 3 },
+      { type: "agent_started", agent: "retriever", message: "2", at: 4 },
+      { type: "agent_started", agent: "analyst", message: "3", at: 5 },
+    ].reduce((acc, e) => applyEvent(acc, e as ResearchEvent), initialViewState);
+    expect(s.contradictions).toEqual([]);
+    expect(s.findings).toEqual([]);
+  });
+
+  it("ignores malformed or unknown events instead of crashing", () => {
+    const before = applyEvent(initialViewState, { type: "run_started", query: "q?", depth: "quick", at: 0 });
+    const bad = [
+      { type: "source_found", at: 1 },
+      { type: "finding_added", finding: null, at: 2 },
+      { type: "totally_unknown", at: 3 },
+    ];
+    let s = before;
+    for (const e of bad) s = applyEvent(s, e as unknown as ResearchEvent);
+    expect(s.sources).toEqual([]);
+    expect(s.query).toBe("q?");
+  });
+});

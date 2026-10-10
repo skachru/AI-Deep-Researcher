@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { ANON_COOKIE, SESSION_COOKIE, SESSION_TTL_S } from "@/lib/auth/constants";
 import { consumeLoginToken } from "@/lib/auth/login";
+import { safeRedirectPath } from "@/lib/auth/redirect";
 import { createSessionToken } from "@/lib/auth/session";
 import { claimAnonymousSearches } from "@/lib/db/searches";
 import { upsertUser } from "@/lib/db/users";
@@ -12,8 +13,7 @@ export const runtime = "nodejs";
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") ?? "";
-  const nextParam = url.searchParams.get("next") ?? "/history";
-  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/history";
+  const next = safeRedirectPath(url.searchParams.get("next"));
 
   const email = token ? await consumeLoginToken(token) : null;
   if (!email) return NextResponse.redirect(new URL("/login?error=expired", request.url));

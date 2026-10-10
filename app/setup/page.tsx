@@ -1,8 +1,10 @@
 import { CheckCircle2, CircleSlash, XCircle, AlertTriangle } from "lucide-react";
 import { headers } from "next/headers";
 import { SiteHeader } from "@/components/site-header";
-import { getViewer } from "@/lib/auth/session";
-import { runSetupChecks, runSpeedTest, type CheckStatus } from "@/lib/setup/checks";
+import { adminEmails, getViewer } from "@/lib/auth/session";
+import { hasAdminSignedIn } from "@/lib/db/users";
+import { consumeLimit } from "@/lib/rateLimit";
+import { runSetupChecks, runSpeedTest, type Check, type CheckStatus } from "@/lib/setup/checks";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -18,7 +20,8 @@ const ICON: Record<CheckStatus, { icon: typeof CheckCircle2; className: string; 
 /**
  * Validates the deployment's configuration live (OpenRouter key and model, Google OAuth
  * client + redirect URI, database, SMTP). Shows no secrets. Open to everyone
- * until an admin has signed in, then admins only.
+ * until an admin has signed in, then admins only. Authorisation is checked
+ * before any diagnostic or paid call runs.
  */
 export default async function SetupPage({ searchParams }: { searchParams: Promise<{ test?: string }> }) {
   const { test } = await searchParams;
@@ -27,13 +30,10 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const requestUrl = `${proto}://${host}/setup`;
 
+  // Authorise BEFORE running anything: diagnostics are open only until an admin has
+  // signed in, and the paid speed test is admin-only (or rate-limited while bootstrapping).
   const viewer = await getViewer();
-  const [base, speed] = await Promise.all([
-    runSetupChecks(requestUrl),
-    test === "1" ? runSpeedTest() : Promise.resolve([]),
-  ]);
-  const checks = [...base, ...speed];
-  const adminExists = checks.some((c) => c.name === "Database" && /[1-9]\d* users/.test(c.detail));
+  const adminExists = viewer.isAdmin ? true : await hasAdminSignedIn(adminEmails()).catch(() => false);
   if (adminExists && !viewer.isAdmin) {
     return (
       <div className="min-h-dvh">
@@ -44,6 +44,22 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
       </div>
     );
   }
+
+  let speed: Check[] = [];
+  if (test === "1") {
+    const allowed = viewer.isAdmin || (await consumeLimit({ key: "setup-speed-test", limit: 1, windowSeconds: 300 }));
+    speed = allowed
+      ? await runSpeedTest()
+      : [
+          {
+            group: "Speed test",
+            name: "Speed test",
+            status: "warn",
+            detail: "A speed test ran in the last 5 minutes. Wait a moment, or sign in as an admin to run it any time.",
+          },
+        ];
+  }
+  const checks = [...(await runSetupChecks(requestUrl)), ...speed];
 
   const groups = [...new Set(checks.map((c) => c.group))];
   const failing = checks.filter((c) => c.status === "fail").length;

@@ -27,9 +27,10 @@ export function normaliseUrl(url: string): string {
     const u = new URL(url);
     u.hash = "";
     ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"].forEach((p) => u.searchParams.delete(p));
-    return `${u.host.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${u.search}`.toLowerCase();
+    // Hostnames are case-insensitive; paths and queries are not (e.g. arXiv ids, YouTube ids).
+    return `${u.host.toLowerCase().replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${u.search}`;
   } catch {
-    return url.toLowerCase();
+    return url.trim();
   }
 }
 

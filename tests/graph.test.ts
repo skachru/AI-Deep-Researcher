@@ -13,6 +13,14 @@ const usageMsg = (content = "") =>
   new AIMessage({ content, usage_metadata: { input_tokens: 100, output_tokens: 50, total_tokens: 150 } });
 
 let analysisCalls = 0;
+/** Delay before the mocked quick summary streams its first token (ms). */
+let summaryDelayMs = 0;
+
+// No network in unit tests: the model-metadata lookup is mocked too.
+vi.mock("@/lib/modelInfo", () => ({
+  loadModelInfo: vi.fn(async () => null),
+  currentReasoningParam: () => undefined,
+}));
 
 vi.mock("@/lib/llm", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/llm")>();
@@ -89,6 +97,7 @@ vi.mock("@/lib/llm", async (importActual) => {
       invoke: async () => usageMsg("## Summary\n- Assistants help [1]."),
       stream: async () =>
         (async function* () {
+          if (summaryDelayMs) await new Promise((r) => setTimeout(r, summaryDelayMs));
           yield new AIMessageChunk({ content: "- Quick " });
           yield new AIMessageChunk({ content: "answer" });
         })(),
@@ -126,6 +135,20 @@ process.env.OPENROUTER_API_KEY ??= "sk-or-test";
 describe("research graph", () => {
   beforeEach(() => {
     analysisCalls = 0;
+    summaryDelayMs = 0;
+  });
+
+  it("a slow quick summary does not hold up the research pipeline", async () => {
+    summaryDelayMs = 400;
+    const { runResearch } = await import("@/lib/graph/run");
+    const events: ResearchEvent[] = [];
+    for await (const e of runResearch({ query: "Do AI coding assistants help?", depth: "quick" })) events.push(e);
+    const analystAt = events.findIndex((e) => e.type === "agent_started" && e.agent === "analyst");
+    const summaryAt = events.findIndex((e) => e.type === "summary_ready");
+    expect(analystAt).toBeGreaterThan(-1);
+    // Analysis starts while the summary is still pending (previously it waited for it).
+    expect(summaryAt === -1 || analystAt < summaryAt).toBe(true);
+    expect(events.some((e) => e.type === "report_ready")).toBe(true);
   });
 
   it("streams a quick summary first, then runs the agents without looping in Quick depth", async () => {

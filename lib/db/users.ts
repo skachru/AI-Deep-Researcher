@@ -55,3 +55,11 @@ export async function listUsers(limit = 50): Promise<UserRow[]> {
     searches: r.searches,
   }));
 }
+
+/** True once any configured admin has signed in (ends the open "bootstrap" window of /setup). */
+export async function hasAdminSignedIn(admins: string[]): Promise<boolean> {
+  const sql = await db();
+  if (!sql || admins.length === 0) return false;
+  const rows = (await sql`SELECT 1 FROM users WHERE email = ANY(${admins}) LIMIT 1`) as unknown[];
+  return rows.length > 0;
+}

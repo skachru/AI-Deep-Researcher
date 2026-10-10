@@ -2,6 +2,7 @@ import { GoogleButton } from "@/components/google-button";
 import { LoginForm } from "@/components/login-form";
 import { SiteHeader } from "@/components/site-header";
 import { isGoogleConfigured } from "@/lib/auth/google";
+import { safeRedirectPath } from "@/lib/auth/redirect";
 import { isAuthConfigured } from "@/lib/auth/session";
 import { isDbConfigured } from "@/lib/db";
 import { isEmailConfigured } from "@/lib/email";
@@ -22,7 +23,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const { next, error } = await searchParams;
-  const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/history";
+  const safeNext = safeRedirectPath(next);
   const google = isAuthConfigured() && isGoogleConfigured();
   const emailLink = isAuthConfigured() && isDbConfigured() && isEmailConfigured();
 

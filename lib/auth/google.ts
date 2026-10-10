@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { safeRedirectPath } from "@/lib/auth/redirect";
 
 /**
  * Google Sign-In via OAuth 2.0 authorization-code flow with PKCE and state.
@@ -21,8 +22,8 @@ export function redirectUri(requestUrl: string): string {
   return `${base}/api/auth/google/callback`;
 }
 
-export function safeNext(next: string | null | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/history";
+function safeNext(next: string | null | undefined): string {
+  return safeRedirectPath(next);
 }
 
 export interface OAuthStart {

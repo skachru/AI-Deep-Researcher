@@ -21,13 +21,44 @@ Rules:
 - In Insights & Hypotheses, state each hypothesis with its confidence (High/Medium/Low) in bold.
 - Be concise, specific and neutral. No preamble before the first heading. Do not write Methodology or References sections — they are appended automatically.`;
 
-export function renderInsights(insights: Insight[]): string {
+function renderInsights(insights: Insight[]): string {
   return insights
     .map(
       (i) =>
         `- ${i.title} [${i.confidence}]: ${i.hypothesis}\n  Reasoning: ${i.reasoning.join(" → ")}\n  Sources: ${i.evidenceIds.join(", ")}`,
     )
     .join("\n");
+}
+
+/**
+ * Checks the report prose against the real sources. Pure.
+ * - Citations like [7] or [2, 9] that point to no source are removed.
+ * - A {{Corroborated}} tag on a line citing fewer than two valid sources
+ *   becomes {{Single-source}}.
+ */
+export function verifyCitations(
+  markdown: string,
+  validNumbers: Set<number>,
+): { markdown: string; removed: number; downgraded: number } {
+  let removed = 0;
+  let downgraded = 0;
+  const lines = markdown.split("\n").map((line) => {
+    const cited = new Set<number>();
+    let out = line.replace(/\s?\[(\d{1,3}(?:\s*,\s*\d{1,3})*)\](?!\()/g, (match, group: string) => {
+      const nums = group.split(",").map((n) => Number(n.trim()));
+      const keep = nums.filter((n) => validNumbers.has(n));
+      removed += nums.length - keep.length;
+      keep.forEach((n) => cited.add(n));
+      if (keep.length === 0) return "";
+      return `${match.startsWith(" ") ? " " : ""}[${keep.join(", ")}]`;
+    });
+    if (out.includes("{{Corroborated}}") && cited.size < 2) {
+      downgraded += (out.match(/\{\{Corroborated\}\}/g) ?? []).length;
+      out = out.replace(/\{\{Corroborated\}\}/g, "{{Single-source}}");
+    }
+    return out;
+  });
+  return { markdown: lines.join("\n"), removed, downgraded };
 }
 
 /** Deterministic Methodology section. Pure. */
@@ -79,8 +110,18 @@ export async function reporterAgent(
     { signal: config.signal },
   );
   const usage = usageFrom(response);
-  const body = textOf(response).trim();
-  const report = [`# ${state.query}`, body, buildMethodology(state), buildReferences(state.sources)].join("\n\n");
+  const valid = new Set(state.sources.map((s) => sourceNumber(s.id)));
+  const { markdown: body, removed, downgraded } = verifyCitations(textOf(response).trim(), valid);
+  const notes = [...state.notes];
+  if (removed)
+    notes.push(`${removed} citation${removed > 1 ? "s" : ""} to non-existent sources removed from the report text.`);
+  if (downgraded)
+    notes.push(
+      `${downgraded} claim label${downgraded > 1 ? "s" : ""} downgraded to Single-source (fewer than two cited sources).`,
+    );
+  const report = [`# ${state.query}`, body, buildMethodology({ ...state, notes }), buildReferences(state.sources)].join(
+    "\n\n",
+  );
 
   emit(config, { type: "usage", usage });
   emit(config, { type: "report_ready", report, sources: state.sources.map(toSummary) });

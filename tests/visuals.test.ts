@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPublicAddress, parseOgImage } from "@/lib/tools/ogImage";
+import { fetchOgImage, isPublicAddress, parseOgImage } from "@/lib/tools/ogImage";
 
 describe("preview images", () => {
   it("reads og:image in either attribute order and resolves relative URLs", () => {
@@ -11,6 +11,45 @@ describe("preview images", () => {
     );
     expect(parseOgImage('<meta property="og:image" content="http://insecure.com/a.jpg">', "https://x.com")).toBeNull();
     expect(parseOgImage("<title>none</title>", "https://x.com")).toBeNull();
+  });
+
+  it("blocks the full IPv6 link-local range and IPv4 embedded in IPv6", () => {
+    for (const ip of [
+      "fe90::1",
+      "febf::1",
+      "fec0::1",
+      "ff02::1",
+      "::",
+      "::ffff:127.0.0.1",
+      "::ffff:7f00:1",
+      "64:ff9b::a00:1",
+      "2002:0a00:0001::1",
+      "2001:db8::1",
+      "[::1]",
+    ]) {
+      expect(isPublicAddress(ip), ip).toBe(false);
+    }
+    expect(isPublicAddress("::ffff:8.8.8.8")).toBe(true);
+    expect(isPublicAddress("2002:0808:0808::1")).toBe(true);
+    expect(isPublicAddress("100.64.0.1")).toBe(false);
+    expect(isPublicAddress("198.18.0.1")).toBe(false);
+  });
+
+  it("refuses to connect to local servers, by name or literal IP", async () => {
+    const http = await import("node:http");
+    const server = http.createServer((_, res) => res.end('<meta property="og:image" content="https://x.com/a.png">'));
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    const port = (server.address() as { port: number }).port;
+    try {
+      // Non-default ports are rejected outright…
+      await expect(fetchOgImage(`http://127.0.0.1:${port}/`)).rejects.toThrow();
+      // …and a name that resolves to loopback is blocked at connect time.
+      await expect(fetchOgImage("http://localhost/")).rejects.toThrow(/Blocked non-public address for localhost/);
+      await expect(fetchOgImage("http://127.0.0.1/")).rejects.toThrow(/blocked address/);
+      await expect(fetchOgImage("http://user:pw@example.com/")).rejects.toThrow(/credentials/);
+    } finally {
+      server.close();
+    }
   });
 
   it("blocks private, loopback and link-local addresses", () => {

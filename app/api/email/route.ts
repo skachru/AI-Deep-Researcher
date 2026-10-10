@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getViewer, normaliseEmail } from "@/lib/auth/session";
-import { countRecentEmails, recordEmailDelivery } from "@/lib/db/searches";
+import { recordEmailDelivery } from "@/lib/db/searches";
+import { clientIp, consumeAll, LIMITS } from "@/lib/rateLimit";
 import { EMAIL_PATTERN, isEmailConfigured, sendMail } from "@/lib/email";
 import { renderReportHtml } from "@/lib/report/html";
 import { extractSummary, plainClaims } from "@/lib/report/markdown";
@@ -9,8 +10,6 @@ import { renderReportPdf } from "@/lib/report/pdf";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const EMAILS_PER_DAY = 10;
 
 const BodySchema = z.object({
   email: z.string().trim().max(254).regex(EMAIL_PATTERN, "Please enter a valid email address"),
@@ -27,8 +26,18 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const viewer = await getViewer();
-  if (!viewer.isAdmin && (await countRecentEmails(viewer.anonId, 24)) >= EMAILS_PER_DAY) {
-    return Response.json({ error: "Daily email limit reached. Please download the report instead." }, { status: 429 });
+  if (!viewer.isAdmin) {
+    const allowed = await consumeAll([
+      { key: `email:user:${viewer.email ?? viewer.anonId}`, limit: LIMITS.emailsPerUserDay(), windowSeconds: 86_400 },
+      { key: `email:ip:${clientIp(request)}`, limit: LIMITS.emailsPerIpDay(), windowSeconds: 86_400 },
+      { key: "email:global", limit: LIMITS.emailsGlobalDay(), windowSeconds: 86_400 },
+    ]);
+    if (!allowed) {
+      return Response.json(
+        { error: "Daily email limit reached. Please download the report instead." },
+        { status: 429 },
+      );
+    }
   }
   const resolved = await resolveReport(viewer, parsed.data.report);
   if ("error" in resolved) return Response.json({ error: resolved.error }, { status: resolved.status });

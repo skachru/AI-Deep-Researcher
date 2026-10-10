@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { getViewer } from "@/lib/auth/session";
-import { completeSearch, countRecentRuns, createSearch, failSearch } from "@/lib/db/searches";
+import { completeSearch, createSearch, failSearch } from "@/lib/db/searches";
 import { getServerEnv } from "@/lib/env";
 import { emptyOutcome, recordEvent } from "@/lib/events/recorder";
 import { encodeSse } from "@/lib/events/sse";
 import { stamp, type ResearchEvent } from "@/lib/events/types";
 import { runResearch } from "@/lib/graph/run";
+import { clientIp, consumeAll, LIMITS } from "@/lib/rateLimit";
 import { AGENT_LABELS } from "@/lib/schemas/domain";
 
 export const runtime = "nodejs";
@@ -18,9 +19,6 @@ export const maxDuration = 300;
 
 /** Abort the graph a little before the platform limit so the client gets a clean error event. */
 const RUN_DEADLINE_MS = (maxDuration - 15) * 1000;
-
-/** Public deployments run on the owner's API key: cap runs per visitor (admins exempt). */
-const RUNS_PER_HOUR = Number(process.env.RUNS_PER_HOUR ?? 10);
 
 const BodySchema = z.object({
   query: z.string().trim().min(8, "Please ask a fuller question").max(500),
@@ -41,11 +39,23 @@ export async function POST(request: Request): Promise<Response> {
 
   const { query, depth } = parsed.data;
   const viewer = await getViewer();
-  if (!viewer.isAdmin && (await countRecentRuns(viewer, 60).catch(() => 0)) >= RUNS_PER_HOUR) {
-    return Response.json(
-      { error: `You've reached the limit of ${RUNS_PER_HOUR} research runs per hour. Please try again later.` },
-      { status: 429 },
-    );
+  // Public deployments run on the owner's API key: limit per visitor, per IP and overall (admins exempt).
+  if (!viewer.isAdmin) {
+    const allowed = await consumeAll([
+      {
+        key: `research:user:${viewer.email ?? viewer.anonId}`,
+        limit: LIMITS.researchPerUserHour(),
+        windowSeconds: 3600,
+      },
+      { key: `research:ip:${clientIp(request)}`, limit: LIMITS.researchPerIpHour(), windowSeconds: 3600 },
+      { key: "research:global", limit: LIMITS.researchGlobalDay(), windowSeconds: 86_400 },
+    ]);
+    if (!allowed) {
+      return Response.json(
+        { error: "You've reached the research limit for now. Please try again later." },
+        { status: 429 },
+      );
+    }
   }
   // History is best-effort: a database problem must not block research.
   const searchId = await createSearch(viewer, query, depth).catch((err: unknown) => {
@@ -69,6 +79,27 @@ export async function POST(request: Request): Promise<Response> {
       const heartbeat = setInterval(() => send(": ping\n\n"), 15_000);
       const startedAt = Date.now();
       let outcome = emptyOutcome();
+      let saved = false;
+      const save = async () => {
+        if (!searchId || saved) return;
+        saved = true;
+        const durationMs = Date.now() - startedAt;
+        const write = outcome.report
+          ? completeSearch(searchId, {
+              quickSummary: outcome.quickSummary,
+              report: outcome.report,
+              sources: outcome.sources,
+              usage: outcome.usage,
+              durationMs,
+            })
+          : failSearch(searchId, {
+              error: outcome.error ?? "Run ended without a report (cancelled or timed out).",
+              quickSummary: outcome.quickSummary,
+              usage: outcome.usage,
+              durationMs,
+            });
+        await write.catch((err: unknown) => console.error("history: could not save search", err));
+      };
 
       try {
         if (searchId) send(stamp({ type: "saved", searchId }));
@@ -87,6 +118,8 @@ export async function POST(request: Request): Promise<Response> {
                 }
               : raw;
           outcome = recordEvent(outcome, event);
+          // Persist before announcing the report, so an immediate download/email finds it.
+          if (event.type === "report_ready") await save();
           send(event);
         }
       } catch (err) {
@@ -95,24 +128,7 @@ export async function POST(request: Request): Promise<Response> {
         send(stamp({ type: "error", message, recoverable: false }));
       } finally {
         clearInterval(heartbeat);
-        if (searchId) {
-          const durationMs = Date.now() - startedAt;
-          const save = outcome.report
-            ? completeSearch(searchId, {
-                quickSummary: outcome.quickSummary,
-                report: outcome.report,
-                sources: outcome.sources,
-                usage: outcome.usage,
-                durationMs,
-              })
-            : failSearch(searchId, {
-                error: outcome.error ?? "Run ended without a report (cancelled or timed out).",
-                quickSummary: outcome.quickSummary,
-                usage: outcome.usage,
-                durationMs,
-              });
-          await save.catch((err: unknown) => console.error("history: could not save search", err));
-        }
+        await save();
         try {
           controller.close();
         } catch {

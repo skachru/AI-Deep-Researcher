@@ -55,6 +55,11 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>): Promise<void>
       last_login_at timestamptz NOT NULL DEFAULT now(),
       login_count integer NOT NULL DEFAULT 1
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS rate_limits (
+      bucket text PRIMARY KEY,
+      count integer NOT NULL,
+      expires_at timestamptz NOT NULL
+    )`;
     await sql`CREATE TABLE IF NOT EXISTS login_tokens (
       token_hash text PRIMARY KEY,
       email text NOT NULL,

@@ -4,11 +4,11 @@ import { emit } from "@/lib/events/emit";
 import type { ResearchStateType, ResearchStateUpdate } from "@/lib/graph/state";
 import { importantGaps, routeAfterAnalysis } from "@/lib/graph/routing";
 import { createModel, UNTRUSTED_NOTICE, usageFrom } from "@/lib/llm";
-import type { Contradiction, Finding, Source } from "@/lib/schemas/domain";
+import type { Claim, ClaimStatus, Contradiction, Finding, Source } from "@/lib/schemas/domain";
 import { toSummary } from "@/lib/schemas/domain";
 import { AnalysisSchema, type Analysis } from "@/lib/schemas/llm";
 import { blendCredibility } from "@/lib/tools/credibility";
-import { renderEvidence, renderSourceIndex, validIds } from "@/lib/agents/context";
+import { domainOf, renderEvidence, renderSourceIndex, validIds } from "@/lib/agents/context";
 
 const SYSTEM_PROMPT = `You are the Critical Analysis agent in a multi-agent research system.
 For each sub-question, read the evidence and:
@@ -20,12 +20,29 @@ For each sub-question, read the evidence and:
 Cite only source ids that appear in the source index. Be rigorous and neutral.
 ${UNTRUSTED_NOTICE}`;
 
-/** Maps the model output onto domain types and drops hallucinated ids. Pure. */
+/**
+ * The label must follow the validated evidence, not the model's word:
+ * "Corroborated" needs at least two valid sources from different sites;
+ * otherwise it is downgraded to "Single-source". Pure.
+ */
+export function claimStatusFromEvidence(
+  status: ClaimStatus,
+  sourceIds: string[],
+  domainById: Map<string, string>,
+): ClaimStatus {
+  if (status !== "Corroborated") return status;
+  const independent = new Set(sourceIds.map((id) => domainById.get(id) ?? id));
+  return independent.size >= 2 ? "Corroborated" : "Single-source";
+}
+
+/** Maps the model output onto domain types, drops hallucinated ids and re-derives claim labels. Pure. */
 export function normaliseAnalysis(
   analysis: Analysis,
   state: Pick<ResearchStateType, "subQuestions" | "sources">,
 ): { findings: Finding[]; contradictions: Contradiction[]; rescored: Source[] } {
   const questionById = new Map(state.subQuestions.map((q) => [q.id, q.question]));
+
+  const domainById = new Map(state.sources.map((s) => [s.id, domainOf(s.url)]));
 
   const findings: Finding[] = analysis.findings
     .filter((f) => questionById.has(f.subQuestionId))
@@ -33,12 +50,16 @@ export function normaliseAnalysis(
       subQuestionId: f.subQuestionId,
       question: questionById.get(f.subQuestionId) ?? "",
       summary: f.summary,
-      claims: f.claims.map((c) => ({ ...c, sourceIds: validIds(c.sourceIds, state.sources) })),
+      claims: f.claims.flatMap((c): Claim[] => {
+        const sourceIds = validIds(c.sourceIds, state.sources);
+        if (sourceIds.length === 0) return []; // unsupported once hallucinated ids are removed
+        return [{ ...c, sourceIds, status: claimStatusFromEvidence(c.status, sourceIds, domainById) }];
+      }),
     }));
 
   const known = new Set(state.sources.map((s) => s.id));
   const contradictions = analysis.contradictions.filter(
-    (c) => known.has(c.claimA.sourceId) && known.has(c.claimB.sourceId),
+    (c) => known.has(c.claimA.sourceId) && known.has(c.claimB.sourceId) && c.claimA.sourceId !== c.claimB.sourceId,
   );
 
   const corroborations = new Map<string, number>();

@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import type { SourceSummary, SourceType } from "@/lib/schemas/domain";
 import { cn } from "@/lib/utils";
 
-export const TYPE_LABEL: Record<SourceType, string> = { web: "Web", news: "News", paper: "Paper", wiki: "Wiki" };
+const TYPE_LABEL: Record<SourceType, string> = { web: "Web", news: "News", paper: "Paper", wiki: "Wiki" };
 const TYPE_TONE = { web: "neutral", news: "warning", paper: "accent", wiki: "success" } as const;
 
 export function SourceTypeBadge({ type }: { type: SourceType }) {

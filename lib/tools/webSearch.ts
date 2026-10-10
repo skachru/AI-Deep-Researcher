@@ -12,7 +12,7 @@ import type { RawSource } from "@/lib/tools/types";
  * returns standardised `url_citation` annotations on the message: url, title,
  * an excerpt of the page (`content`) and the span of the answer it supports.
  */
-export const WEB_SEARCH_TOOL = "openrouter:web_search";
+const WEB_SEARCH_TOOL = "openrouter:web_search";
 
 export type WebSearchMode = "web" | "news";
 

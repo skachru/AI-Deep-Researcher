@@ -17,9 +17,9 @@ function reducer(state: ResearchViewState, action: Action): ResearchViewState {
   return action.kind === "reset" ? initialViewState : applyEvent(state, action.event);
 }
 
-async function loadRecording(query: string): Promise<ResearchEvent[] | null> {
+async function loadRecording(query: string, signal: AbortSignal): Promise<ResearchEvent[] | null> {
   try {
-    const res = await fetch(recordingPath(query), { cache: "force-cache" });
+    const res = await fetch(recordingPath(query), { cache: "force-cache", signal });
     if (!res.ok) return null;
     const json: unknown = await res.json();
     return isRecording(json) ? json.events : null;
@@ -34,45 +34,64 @@ export type RunMode = "live" | "replay";
  * Drives a research run: live via SSE from /api/research, or a timed replay
  * of a recorded run. Falls back to a replay automatically if a live run
  * errors or times out and a recording exists for the query.
+ *
+ * Every start() opens a new "generation" with its own AbortController. Each
+ * async step checks that its generation is still current before touching
+ * state, so a slow recording lookup or a finished-late request from an older
+ * run can never override, abort or restart a newer one.
  */
 export function useResearch() {
   const [state, dispatch] = useReducer(reducer, initialViewState);
   const [mode, setMode] = useState<RunMode>("live");
+  const generation = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  /** Cancels whatever is running and invalidates its pending async work. */
   const stop = useCallback(() => {
+    generation.current += 1;
     abortRef.current?.abort();
+    abortRef.current = null;
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
   }, []);
 
-  const replay = useCallback(
-    (events: ResearchEvent[]) => {
-      stop();
-      setMode("replay");
-      dispatch({ kind: "reset" });
-      const delays = replayDelays(events);
-      let elapsed = 0;
-      const base = Date.now();
-      events.forEach((event, i) => {
-        elapsed += delays[i];
-        // Re-stamp so elapsed-time displays reflect the replay, not the recording date.
-        const replayed = { ...event, at: base + elapsed };
-        timersRef.current.push(setTimeout(() => dispatch({ kind: "event", event: replayed }), elapsed));
-      });
-    },
-    [stop],
-  );
+  const begin = useCallback(() => {
+    stop();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const gen = generation.current;
+    return { controller, isCurrent: () => generation.current === gen };
+  }, [stop]);
 
-  const startLive = useCallback(
-    async (query: string, depth: Depth) => {
-      stop();
+  const playEvents = useCallback((events: ResearchEvent[], isCurrent: () => boolean) => {
+    if (!isCurrent()) return;
+    setMode("replay");
+    dispatch({ kind: "reset" });
+    const delays = replayDelays(events);
+    let elapsed = 0;
+    const base = Date.now();
+    events.forEach((event, i) => {
+      elapsed += delays[i];
+      // Re-stamp so elapsed-time displays reflect the replay, not the recording date.
+      const replayed = { ...event, at: base + elapsed };
+      timersRef.current.push(
+        setTimeout(() => {
+          if (isCurrent()) dispatch({ kind: "event", event: replayed });
+        }, elapsed),
+      );
+    });
+  }, []);
+
+  const runLive = useCallback(
+    async (query: string, depth: Depth, controller: AbortController, isCurrent: () => boolean) => {
       setMode("live");
       dispatch({ kind: "reset" });
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const timeout = setTimeout(() => controller.abort(new DOMException("timeout", "TimeoutError")), LIVE_TIMEOUT_MS);
+      let timedOut = false;
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, LIVE_TIMEOUT_MS);
 
       let failure: string | null = null;
       let finished = false;
@@ -92,9 +111,14 @@ export function useResearch() {
         const parse = createSseParser();
         for (;;) {
           const { value, done } = await reader.read();
-          if (done) break;
+          if (done || !isCurrent()) break;
           for (const data of parse(value)) {
-            const event: unknown = JSON.parse(data);
+            let event: unknown;
+            try {
+              event = JSON.parse(data);
+            } catch {
+              continue; // ignore a malformed frame rather than failing the run
+            }
             if (!isResearchEvent(event)) continue;
             dispatch({ kind: "event", event });
             if (event.type === "report_ready") finished = true;
@@ -103,36 +127,34 @@ export function useResearch() {
         }
         if (!finished && !failure) failure = "The research stream ended unexpectedly.";
       } catch (err) {
-        const timedOut =
-          controller.signal.reason instanceof DOMException && controller.signal.reason.name === "TimeoutError";
-        if (controller.signal.aborted && !timedOut) return; // user navigated away or started another run
+        if (!timedOut && controller.signal.aborted) return; // superseded or navigated away
         failure = timedOut ? "The live run timed out." : err instanceof Error ? err.message : String(err);
       } finally {
         clearTimeout(timeout);
       }
 
-      if (failure) {
-        const recording = await loadRecording(query);
-        if (recording) {
-          replay(recording);
-          return;
-        }
-        dispatch({ kind: "event", event: stamp({ type: "error", message: failure, recoverable: false }) });
-      }
+      if (!failure || !isCurrent()) return;
+      // Fall back to a recording if one exists — but only while this run is still the current one.
+      const recording = await loadRecording(query, AbortSignal.timeout(5000));
+      if (!isCurrent()) return;
+      if (recording) return playEvents(recording, isCurrent);
+      dispatch({ kind: "event", event: stamp({ type: "error", message: failure, recoverable: false }) });
     },
-    [replay, stop],
+    [playEvents],
   );
 
   /** Entry point: replays when demo mode is on and a recording exists, otherwise runs live. */
   const start = useCallback(
     async (query: string, depth: Depth, preferReplay: boolean) => {
+      const { controller, isCurrent } = begin();
       if (preferReplay) {
-        const recording = await loadRecording(query);
-        if (recording) return replay(recording);
+        const recording = await loadRecording(query, controller.signal);
+        if (!isCurrent()) return;
+        if (recording) return playEvents(recording, isCurrent);
       }
-      return startLive(query, depth);
+      return runLive(query, depth, controller, isCurrent);
     },
-    [replay, startLive],
+    [begin, playEvents, runLive],
   );
 
   return { state, mode, start, stop };

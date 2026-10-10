@@ -90,6 +90,15 @@ function upsertSource(list: SourceSummary[], source: SourceSummary): SourceSumma
 
 /** Folds one streamed event into the UI state. Pure; shared by live runs and demo replays. */
 export function applyEvent(state: ResearchViewState, e: ResearchEvent): ResearchViewState {
+  try {
+    return applyEventUnchecked(state, e) ?? state;
+  } catch {
+    // A malformed event (missing fields, unknown shape) is ignored rather than crashing the page.
+    return state;
+  }
+}
+
+function applyEventUnchecked(state: ResearchViewState, e: ResearchEvent): ResearchViewState | undefined {
   switch (e.type) {
     case "run_started":
       return {
@@ -111,6 +120,9 @@ export function applyEvent(state: ResearchViewState, e: ResearchEvent): Research
         activeAgent: e.agent,
         passes: e.agent === "retriever" ? state.passes + 1 : state.passes,
         handoffs,
+        // Each analysis pass replaces findings and contradictions wholesale (as the graph state does),
+        // so results the second pass resolved must not linger from the first.
+        ...(e.agent === "analyst" ? { findings: [], contradictions: [] } : {}),
         activity: log(state, { at: e.at, agent: e.agent, kind: "start", message: e.message }),
       };
     }
@@ -232,6 +244,8 @@ export function applyEvent(state: ResearchViewState, e: ResearchEvent): Research
             finishedAt: e.at,
             activity: log(state, { at: e.at, agent: "system", kind: "error", message: e.message }),
           };
+    default:
+      return state;
   }
 }
 
@@ -243,7 +257,7 @@ function lastCompleted(state: ResearchViewState): AgentId | null {
   return null;
 }
 
-export function toolLabel(tool: ToolName): string {
+function toolLabel(tool: ToolName): string {
   const labels: Record<ToolName, string> = {
     web_search: "Web search",
     news_search: "News search",

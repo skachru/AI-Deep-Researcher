@@ -162,6 +162,8 @@ describe("chunking, dedupe and capping", () => {
 
   it("dedupes by normalised URL and title, including against existing sources", () => {
     expect(normaliseUrl("https://www.Example.com/a/?utm_source=x#top")).toBe("example.com/a");
+    // Paths are case-sensitive: these are different pages and must not be merged.
+    expect(normaliseUrl("https://youtu.be/AbC")).not.toBe(normaliseUrl("https://youtu.be/abc"));
     const out = dedupeSources(
       [
         raw({ url: "https://example.com/a" }),

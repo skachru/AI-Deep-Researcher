@@ -39,7 +39,7 @@ export async function createSessionToken(user: SessionUser): Promise<string> {
     .sign(key);
 }
 
-export async function verifySessionToken(token: string | undefined): Promise<SessionUser | null> {
+async function verifySessionToken(token: string | undefined): Promise<SessionUser | null> {
   const key = secretKey();
   if (!token || !key) return null;
   try {

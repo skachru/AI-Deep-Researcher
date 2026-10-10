@@ -18,7 +18,7 @@ export interface ReportRef {
 
 /** Body sent to /api/export and /api/email: the saved id when we have one, else the content. */
 function refBody(ref: ReportRef) {
-  if (ref.searchId) return { searchId: ref.searchId };
+  // Send the saved id (preferred) and the content as a fallback for replays or unsaved runs.
   const sources = ref.sources.map(({ id, title, url, type, credibility, publishedDate, image }) => ({
     id,
     title,
@@ -28,7 +28,7 @@ function refBody(ref: ReportRef) {
     publishedDate,
     image,
   }));
-  return { query: ref.query, markdown: ref.markdown, sources };
+  return { searchId: ref.searchId, query: ref.query, markdown: ref.markdown, sources };
 }
 
 function saveBlob(blob: Blob, filename: string) {

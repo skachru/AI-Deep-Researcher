@@ -1,3 +1,4 @@
+import { clientIp, consumeLimit } from "@/lib/rateLimit";
 import { fetchOgImage } from "@/lib/tools/ogImage";
 
 export const runtime = "nodejs";
@@ -6,6 +7,9 @@ export const runtime = "nodejs";
 export async function GET(request: Request): Promise<Response> {
   const target = new URL(request.url).searchParams.get("url") ?? "";
   if (!target || target.length > 2000) return Response.json({ image: null }, { status: 400 });
+  if (!(await consumeLimit({ key: `og:ip:${clientIp(request)}`, limit: 300, windowSeconds: 3600 }))) {
+    return Response.json({ image: null }, { status: 429 });
+  }
   const image = await fetchOgImage(target).catch(() => null);
   return Response.json(
     { image },

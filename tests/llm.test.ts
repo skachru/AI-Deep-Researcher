@@ -58,3 +58,14 @@ describe("reasoning control", () => {
     expect(parseModelInfo({ nope: 1 })).toBeNull();
   });
 });
+
+describe("errorMessage", () => {
+  it("never throws, whatever is thrown", async () => {
+    const { errorMessage } = await import("@/lib/graph/run");
+    expect(errorMessage(null)).toBe("null");
+    expect(errorMessage(undefined)).toBe("undefined");
+    expect(errorMessage("x")).toBe("x");
+    expect(errorMessage(new AggregateError([new Error("inner")], "outer"))).toBe("inner");
+    expect(errorMessage({ errors: [new Error("nested")] })).toBe("nested");
+  });
+});

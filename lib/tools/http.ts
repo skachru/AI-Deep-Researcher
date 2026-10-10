@@ -14,7 +14,7 @@ export interface FetchRetryOptions {
 
 export const USER_AGENT = "LumenDeepResearcher/0.1 (hackathon demo; https://github.com/skachru/AI-Deep-Researcher)";
 
-export function isRetryableStatus(status: number): boolean {
+function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
 

@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/auth/session";
 import { renderReportHtml } from "@/lib/report/html";
 import { fileSlug, ReportRefSchema, resolveReport } from "@/lib/report/payload";
 import { renderReportPdf } from "@/lib/report/pdf";
+import { clientIp, consumeLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,9 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Invalid request" }, { status: 400 });
 
+  if (!(await consumeLimit({ key: `export:ip:${clientIp(request)}`, limit: 60, windowSeconds: 3600 }))) {
+    return Response.json({ error: "Too many downloads. Please try again later." }, { status: 429 });
+  }
   const resolved = await resolveReport(await getViewer(), parsed.data.report);
   if ("error" in resolved) return Response.json({ error: resolved.error }, { status: resolved.status });
 

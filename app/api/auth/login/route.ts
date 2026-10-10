@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { createLoginToken } from "@/lib/auth/login";
+import { safeRedirectPath } from "@/lib/auth/redirect";
 import { isAuthConfigured, normaliseEmail } from "@/lib/auth/session";
 import { isDbConfigured } from "@/lib/db";
 import { EMAIL_PATTERN, isEmailConfigured, sendMail } from "@/lib/email";
+import { clientIp, consumeLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -21,11 +23,14 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   }
   const email = normaliseEmail(parsed.data.email);
+  if (!(await consumeLimit({ key: `login:ip:${clientIp(request)}`, limit: 10, windowSeconds: 3600 }))) {
+    return Response.json({ error: "Too many sign-in links requested. Try again later." }, { status: 429 });
+  }
   try {
     const token = await createLoginToken(email);
     const url = new URL("/api/auth/callback", request.url);
     url.searchParams.set("token", token);
-    if (parsed.data.next && !parsed.data.next.startsWith("//")) url.searchParams.set("next", parsed.data.next);
+    url.searchParams.set("next", safeRedirectPath(parsed.data.next));
     await sendMail({
       to: email,
       subject: "Your Lumen sign-in link",

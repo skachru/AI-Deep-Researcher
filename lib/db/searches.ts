@@ -128,25 +128,8 @@ export async function claimAnonymousSearches(anonId: string, email: string): Pro
   await sql`UPDATE searches SET user_email = ${email} WHERE anon_id = ${anonId} AND user_email IS NULL`;
 }
 
-export async function countRecentRuns(viewer: Viewer, windowMinutes: number): Promise<number> {
-  const sql = await db();
-  if (!sql) return 0;
-  const rows = (await sql`SELECT count(*)::int AS n FROM searches
-    WHERE (anon_id = ${viewer.anonId} OR (${viewer.email}::text IS NOT NULL AND user_email = ${viewer.email}))
-    AND created_at > now() - make_interval(mins => ${windowMinutes})`) as { n: number }[];
-  return rows[0]?.n ?? 0;
-}
-
 export async function recordEmailDelivery(searchId: string | null, recipient: string, anonId: string): Promise<void> {
   const sql = await db();
   if (!sql) return;
   await sql`INSERT INTO email_deliveries (search_id, recipient, anon_id) VALUES (${searchId}, ${recipient}, ${anonId})`;
-}
-
-export async function countRecentEmails(anonId: string, windowHours: number): Promise<number> {
-  const sql = await db();
-  if (!sql) return 0;
-  const rows = (await sql`SELECT count(*)::int AS n FROM email_deliveries
-    WHERE anon_id = ${anonId} AND created_at > now() - make_interval(hours => ${windowHours})`) as { n: number }[];
-  return rows[0]?.n ?? 0;
 }

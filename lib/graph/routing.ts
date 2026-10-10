@@ -1,10 +1,10 @@
 import type { Depth, Gap } from "@/lib/schemas/domain";
 
 /** Maximum retrieval passes in total (first pass + one multi-hop follow-up). */
-export const MAX_RETRIEVAL_PASSES = 2;
+const MAX_RETRIEVAL_PASSES = 2;
 
-export const ROUTE_RETRY = "retriever" as const;
-export const ROUTE_CONTINUE = "insight" as const;
+const ROUTE_RETRY = "retriever" as const;
+const ROUTE_CONTINUE = "insight" as const;
 export type AnalysisRoute = typeof ROUTE_RETRY | typeof ROUTE_CONTINUE;
 
 export function importantGaps(gaps: Gap[]): Gap[] {
