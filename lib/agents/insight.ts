@@ -37,7 +37,7 @@ export async function insightAgent(
   const startedAt = Date.now();
   emit(config, { type: "agent_started", agent: "insight", message: "Reasoning over findings to form hypotheses" });
 
-  const model = createModel({ maxTokens: 12_000 }).withStructuredOutput(InsightsSchema, {
+  const model = createModel({ maxTokens: 4000 }).withStructuredOutput(InsightsSchema, {
     method: "jsonSchema",
     strict: true,
     includeRaw: true,

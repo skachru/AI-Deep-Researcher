@@ -71,7 +71,7 @@ export async function analystAgent(
     message: `Cross-checking ${state.evidence.length} evidence chunks from ${state.sources.length} sources`,
   });
 
-  const model = createModel({ maxTokens: 16_000 }).withStructuredOutput(AnalysisSchema, {
+  const model = createModel({ maxTokens: 6000 }).withStructuredOutput(AnalysisSchema, {
     method: "jsonSchema",
     strict: true,
     includeRaw: true,

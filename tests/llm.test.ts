@@ -39,3 +39,22 @@ describe("OpenRouter model client", () => {
     expect(headers.get("x-title")).toBe("Lumen");
   });
 });
+
+describe("reasoning control", () => {
+  it("turns thinking off where allowed, keeps it minimal where mandatory, and leaves other models alone", async () => {
+    const { parseModelInfo, reasoningParam } = await import("@/lib/modelInfo");
+    const optional = parseModelInfo({ id: "a/r", supported_parameters: ["reasoning", "tools", "response_format"] });
+    const mandatory = parseModelInfo({
+      id: "a/m",
+      supported_parameters: ["reasoning"],
+      reasoning: { mandatory: true },
+    });
+    const plain = parseModelInfo({ id: "a/p", supported_parameters: ["tools", "response_format"] });
+    expect(reasoningParam(optional)).toEqual({ effort: "none", exclude: true });
+    expect(reasoningParam(mandatory)).toEqual({ effort: "low", exclude: true });
+    expect(reasoningParam(plain)).toBeUndefined();
+    expect(reasoningParam(null)).toBeUndefined();
+    expect(reasoningParam(optional, "medium")).toEqual({ effort: "medium", exclude: true });
+    expect(parseModelInfo({ nope: 1 })).toBeNull();
+  });
+});

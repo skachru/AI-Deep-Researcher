@@ -1,5 +1,6 @@
 import { getServerEnv } from "@/lib/env";
-import { OPENROUTER_BASE_URL, openRouterHeaders } from "@/lib/llm";
+import { currentReasoningParam } from "@/lib/modelInfo";
+import { OPENROUTER_BASE_URL, openRouterHeaders } from "@/lib/openrouter";
 import type { Usage } from "@/lib/schemas/domain";
 import { ZERO_USAGE } from "@/lib/schemas/domain";
 import { fetchWithRetry } from "@/lib/tools/http";
@@ -89,8 +90,8 @@ export async function webSearch(params: {
 
   const res = await fetchWithRetry(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
-    timeoutMs: 90_000,
-    retries: 1,
+    timeoutMs: 75_000,
+    retries: 0,
     signal,
     headers: {
       Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
@@ -99,7 +100,8 @@ export async function webSearch(params: {
     },
     body: JSON.stringify({
       model: env.OPENROUTER_MODEL,
-      max_tokens: 3000,
+      max_tokens: 1500,
+      ...(currentReasoningParam() ? { reasoning: currentReasoningParam() } : {}),
       tools: [{ type: WEB_SEARCH_TOOL, parameters: { max_results: maxResults, max_total_results: maxResults } }],
       messages: [
         {

@@ -68,7 +68,7 @@ export async function reporterAgent(
   const startedAt = Date.now();
   emit(config, { type: "agent_started", agent: "reporter", message: "Drafting the cited research report" });
 
-  const model = createModel({ maxTokens: 16_000, timeoutMs: 150_000 });
+  const model = createModel({ maxTokens: 5000, timeoutMs: 90_000 });
   const response = await model.invoke(
     [
       new SystemMessage(SYSTEM_PROMPT),

@@ -3,8 +3,10 @@ import { AIMessage, type BaseMessage } from "@langchain/core/messages";
 import { getServerEnv } from "@/lib/env";
 import type { Depth, Usage } from "@/lib/schemas/domain";
 import { ZERO_USAGE } from "@/lib/schemas/domain";
+import { currentReasoningParam } from "@/lib/modelInfo";
+import { OPENROUTER_BASE_URL, openRouterHeaders } from "@/lib/openrouter";
 
-export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+export { OPENROUTER_BASE_URL, openRouterHeaders } from "@/lib/openrouter";
 
 export interface ModelOptions {
   /** Hard cap on output tokens for this agent. */
@@ -12,29 +14,28 @@ export interface ModelOptions {
   timeoutMs?: number;
 }
 
-/** Headers OpenRouter uses to attribute traffic to the app (optional but recommended). */
-export function openRouterHeaders(): Record<string, string> {
-  return { "HTTP-Referer": process.env.APP_URL ?? "https://github.com/skachru/AI-Deep-Researcher", "X-Title": "Lumen" };
-}
-
 /**
  * One factory for every agent: an OpenAI-compatible chat model served through
  * OpenRouter (model chosen with OPENROUTER_MODEL). `require_parameters` makes
  * OpenRouter route only to providers that support every parameter we send —
  * in particular `response_format` for structured outputs. The client retries
- * 408/429/5xx with exponential backoff (`maxRetries`).
+ * 408/429/5xx with exponential backoff (`maxRetries`). For reasoning models,
+ * "thinking" is switched off or kept minimal (see lib/modelInfo.ts) — it
+ * multiplies latency and the agents get their rigour from the pipeline.
  */
-export function createModel({ maxTokens, timeoutMs = 120_000 }: ModelOptions): ChatOpenAICompletions {
+export function createModel({ maxTokens, timeoutMs = 60_000 }: ModelOptions): ChatOpenAICompletions {
   const env = getServerEnv();
+  const reasoning = currentReasoningParam();
   return new ChatOpenAICompletions({
     model: env.OPENROUTER_MODEL,
     apiKey: env.OPENROUTER_API_KEY,
     maxTokens,
+    // Short timeout + a single retry keeps one slow call from eating the whole 300s function budget.
     timeout: timeoutMs,
-    maxRetries: 3,
+    maxRetries: 1,
     streamUsage: true,
     configuration: { baseURL: OPENROUTER_BASE_URL, defaultHeaders: openRouterHeaders() },
-    modelKwargs: { provider: { require_parameters: true } },
+    modelKwargs: { provider: { require_parameters: true }, ...(reasoning ? { reasoning } : {}) },
   });
 }
 

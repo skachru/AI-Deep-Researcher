@@ -6,6 +6,7 @@ import { emptyOutcome, recordEvent } from "@/lib/events/recorder";
 import { encodeSse } from "@/lib/events/sse";
 import { stamp, type ResearchEvent } from "@/lib/events/types";
 import { runResearch } from "@/lib/graph/run";
+import { AGENT_LABELS } from "@/lib/schemas/domain";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,8 +72,20 @@ export async function POST(request: Request): Promise<Response> {
 
       try {
         if (searchId) send(stamp({ type: "saved", searchId }));
-        const signal = AbortSignal.any([request.signal, AbortSignal.timeout(RUN_DEADLINE_MS)]);
-        for await (const event of runResearch({ query, depth, signal })) {
+        const deadline = AbortSignal.timeout(RUN_DEADLINE_MS);
+        const signal = AbortSignal.any([request.signal, deadline]);
+        let activeAgent: string | null = null;
+        for await (const raw of runResearch({ query, depth, signal })) {
+          if (raw.type === "agent_started") activeAgent = AGENT_LABELS[raw.agent];
+          if (raw.type === "agent_completed") activeAgent = null;
+          // Name the stage that ran out of time instead of a generic "aborted".
+          const event =
+            raw.type === "error" && !raw.recoverable && deadline.aborted
+              ? {
+                  ...raw,
+                  message: `Timed out after ${Math.round(RUN_DEADLINE_MS / 1000)}s${activeAgent ? ` while the ${activeAgent} agent was running` : ""}. The model may be too slow — open /setup and run the speed test.`,
+                }
+              : raw;
           outcome = recordEvent(outcome, event);
           send(event);
         }

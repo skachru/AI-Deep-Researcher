@@ -68,18 +68,19 @@ Other scripts:
 
 ## Environment variables
 
-| Variable                                                     | Required           | Description                                                                                                                                                     |
-| ------------------------------------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OPENROUTER_API_KEY`                                         | Yes                | The only key needed (openrouter.ai/keys). arXiv and Wikipedia are free; web search runs through OpenRouter's web search tool (billed per result by OpenRouter). |
-| `OPENROUTER_MODEL`                                           | No                 | Any OpenRouter model id with structured outputs + tools. Defaults to `qwen/qwen3.8-flash` (low cost). `/setup` shows its price and capabilities.                |
-| `NEXT_PUBLIC_DEMO_MODE`                                      | No                 | `true` makes the example chips replay recorded runs instantly.                                                                                                  |
-| `DATABASE_URL`                                               | For history        | Postgres (Neon). Enables per-user history, the admin dashboard and rate limits. Tables are created automatically on first use.                                  |
-| `AUTH_SECRET`                                                | For sign-in        | 32+ random characters for signing sessions (`openssl rand -base64 48`).                                                                                         |
-| `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET`                    | For Google sign-in | OAuth client ("Web application") from Google Cloud. Redirect URI: `https://<domain>/api/auth/google/callback`.                                                  |
-| `APP_URL`                                                    | No                 | Pins the public URL used for the Google redirect (otherwise taken from the request).                                                                            |
-| `ADMIN_EMAILS`                                               | No                 | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                                  |
-| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email          | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).                    |
-| `RUNS_PER_HOUR`                                              | No                 | Research runs allowed per visitor per hour (default 10; admins exempt).                                                                                         |
+| Variable                                                     | Required           | Description                                                                                                                                                                                  |
+| ------------------------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                                         | Yes                | The only key needed (openrouter.ai/keys). arXiv and Wikipedia are free; web search runs through OpenRouter's web search tool (billed per result by OpenRouter).                              |
+| `OPENROUTER_MODEL`                                           | No                 | Any OpenRouter model id with structured outputs + tools. Defaults to `qwen/qwen3.8-flash` (low cost). `/setup` shows its price and capabilities.                                             |
+| `NEXT_PUBLIC_DEMO_MODE`                                      | No                 | `true` makes the example chips replay recorded runs instantly.                                                                                                                               |
+| `DATABASE_URL`                                               | For history        | Postgres (Neon). Enables per-user history, the admin dashboard and rate limits. Tables are created automatically on first use.                                                               |
+| `AUTH_SECRET`                                                | For sign-in        | 32+ random characters for signing sessions (`openssl rand -base64 48`).                                                                                                                      |
+| `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET`                    | For Google sign-in | OAuth client ("Web application") from Google Cloud. Redirect URI: `https://<domain>/api/auth/google/callback`.                                                                               |
+| `OPENROUTER_REASONING`                                       | No                 | `auto` (default) switches "thinking" off on reasoning models (or keeps it low where mandatory) so runs stay inside the time limit. Set `low`/`medium`/`high` for more depth on a fast model. |
+| `APP_URL`                                                    | No                 | Pins the public URL used for the Google redirect (otherwise taken from the request).                                                                                                         |
+| `ADMIN_EMAILS`                                               | No                 | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                                                               |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email          | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).                                                 |
+| `RUNS_PER_HOUR`                                              | No                 | Research runs allowed per visitor per hour (default 10; admins exempt).                                                                                                                      |
 
 Variables are validated with Zod on first use (`lib/env.ts`), so a missing key produces a clear error instead of a crash.
 
@@ -102,7 +103,7 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
 
 Each feature switches on when its environment variables are set; without them the app still runs research.
 
-**Setup check:** open `/setup` on your deployment. It tests the OpenRouter key (and remaining credit), the chosen model's capabilities, the Google OAuth client ID/secret and
+**Setup check:** open `/setup` on your deployment. Its **speed test** times one structured call and one web search with your model, so you can tell at once whether a model is fast enough. It tests the OpenRouter key (and remaining credit), the chosen model's capabilities, the Google OAuth client ID/secret and
 redirect URI (against Google itself), the database and SMTP login, and says exactly what to fix. No secrets are shown;
 once someone has signed in, the page is admin-only.
 

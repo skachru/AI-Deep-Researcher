@@ -20,7 +20,7 @@ import { searchWikipedia } from "@/lib/tools/wikipedia";
 const FOLLOW_UP_RESERVE = 3;
 
 async function planQuery(query: string): Promise<{ plan: Plan; usage: Usage }> {
-  const model = createModel({ maxTokens: 4000 }).withStructuredOutput(PlanSchema, {
+  const model = createModel({ maxTokens: 1500 }).withStructuredOutput(PlanSchema, {
     method: "jsonSchema",
     strict: true,
     includeRaw: true,

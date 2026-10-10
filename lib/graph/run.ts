@@ -2,6 +2,7 @@ import { isResearchEvent } from "@/lib/events/emit";
 import { stamp, type ResearchEvent } from "@/lib/events/types";
 import { getServerEnv } from "@/lib/env";
 import { buildResearchGraph } from "@/lib/graph/graph";
+import { loadModelInfo } from "@/lib/modelInfo";
 import type { Depth } from "@/lib/schemas/domain";
 
 /** Parallel branches can fail together (AggregateError); surface the first real cause. Pure. */
@@ -26,7 +27,8 @@ export interface RunOptions {
 export async function* runResearch({ query, depth, signal }: RunOptions): AsyncGenerator<ResearchEvent> {
   yield stamp({ type: "run_started", query, depth });
   try {
-    getServerEnv(); // fail fast with a readable message if the API key is missing
+    const env = getServerEnv(); // fail fast with a readable message if the API key is missing
+    await loadModelInfo(env.OPENROUTER_MODEL); // decides the reasoning setting for this model
     const graph = buildResearchGraph();
     const stream = await graph.stream({ query, depth }, { streamMode: "custom", signal, recursionLimit: 12 });
     for await (const chunk of stream) {

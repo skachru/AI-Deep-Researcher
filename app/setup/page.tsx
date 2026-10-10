@@ -2,9 +2,10 @@ import { CheckCircle2, CircleSlash, XCircle, AlertTriangle } from "lucide-react"
 import { headers } from "next/headers";
 import { SiteHeader } from "@/components/site-header";
 import { getViewer } from "@/lib/auth/session";
-import { runSetupChecks, type CheckStatus } from "@/lib/setup/checks";
+import { runSetupChecks, runSpeedTest, type CheckStatus } from "@/lib/setup/checks";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 export const metadata = { title: "Setup check — Lumen", robots: { index: false } };
 
 const ICON: Record<CheckStatus, { icon: typeof CheckCircle2; className: string; label: string }> = {
@@ -19,14 +20,19 @@ const ICON: Record<CheckStatus, { icon: typeof CheckCircle2; className: string; 
  * client + redirect URI, database, SMTP). Shows no secrets. Open to everyone
  * until an admin has signed in, then admins only.
  */
-export default async function SetupPage() {
+export default async function SetupPage({ searchParams }: { searchParams: Promise<{ test?: string }> }) {
+  const { test } = await searchParams;
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const requestUrl = `${proto}://${host}/setup`;
 
   const viewer = await getViewer();
-  const checks = await runSetupChecks(requestUrl);
+  const [base, speed] = await Promise.all([
+    runSetupChecks(requestUrl),
+    test === "1" ? runSpeedTest() : Promise.resolve([]),
+  ]);
+  const checks = [...base, ...speed];
   const adminExists = checks.some((c) => c.name === "Database" && /[1-9]\d* users/.test(c.detail));
   if (adminExists && !viewer.isAdmin) {
     return (
@@ -51,6 +57,14 @@ export default async function SetupPage() {
           Live test of this deployment&apos;s settings against OpenRouter, Google, the database and your mail server.{" "}
           {failing ? `${failing} item${failing > 1 ? "s" : ""} need fixing.` : "Everything required is working."}
         </p>
+        {test !== "1" && (
+          <a
+            href="/setup?test=1"
+            className="mt-4 inline-flex h-8 items-center rounded-md bg-accent px-3 text-[13px] font-medium text-accent-foreground shadow-card hover:bg-accent-hover"
+          >
+            Run speed test (one model call + one web search, under $0.01)
+          </a>
+        )}
         <div className="mt-6 space-y-5">
           {groups.map((g) => (
             <section key={g} className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">

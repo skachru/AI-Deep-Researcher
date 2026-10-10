@@ -3,7 +3,7 @@ import { redirectUri } from "@/lib/auth/google";
 import { adminEmails } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { DEFAULT_MODEL } from "@/lib/env";
-import { OPENROUTER_BASE_URL } from "@/lib/llm";
+import { OPENROUTER_BASE_URL } from "@/lib/openrouter";
 
 export type CheckStatus = "ok" | "warn" | "fail" | "off";
 
@@ -348,4 +348,69 @@ export async function runSetupChecks(requestUrl: string): Promise<Check[]> {
     database,
     email,
   ];
+}
+
+/**
+ * Times one structured-output call and one web search with the configured
+ * model — the two operations every research run depends on. Costs a fraction
+ * of a cent; only runs when requested from /setup.
+ */
+export async function runSpeedTest(): Promise<Check[]> {
+  const group = "Speed test";
+  if (!process.env.OPENROUTER_API_KEY) {
+    return [{ group, name: "Speed test", status: "off", detail: "Add OPENROUTER_API_KEY first." }];
+  }
+  const [{ createModel }, { webSearch }, { loadModelInfo, currentReasoningParam }, { z }] = await Promise.all([
+    import("@/lib/llm"),
+    import("@/lib/tools/webSearch"),
+    import("@/lib/modelInfo"),
+    import("zod"),
+  ]);
+  const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  await loadModelInfo(model);
+  const reasoning = currentReasoningParam();
+  const rate = (ms: number): CheckStatus => (ms < 15_000 ? "ok" : ms < 40_000 ? "warn" : "fail");
+  const slowFix =
+    "This model is too slow for the 300-second limit. Set OPENROUTER_MODEL to a faster non-reasoning model with structured outputs + tools, then redeploy.";
+
+  const timed = async (name: string, fn: () => Promise<string>): Promise<Check> => {
+    const t0 = Date.now();
+    try {
+      const detail = await fn();
+      const ms = Date.now() - t0;
+      return {
+        group,
+        name,
+        status: rate(ms),
+        detail: `${(ms / 1000).toFixed(1)}s — ${detail}`,
+        fix: rate(ms) === "ok" ? undefined : slowFix,
+      };
+    } catch (err) {
+      return {
+        group,
+        name,
+        status: "fail",
+        detail: `Failed after ${((Date.now() - t0) / 1000).toFixed(1)}s: ${describe(err)}`,
+      };
+    }
+  };
+
+  return Promise.all([
+    timed("Structured answer", async () => {
+      const llm = createModel({ maxTokens: 400, timeoutMs: 60_000 }).withStructuredOutput(
+        z.object({ subQuestions: z.array(z.string()).describe("Three short sub-questions") }),
+        { method: "jsonSchema", strict: true },
+      );
+      const out = await llm.invoke("Split this research question into three sub-questions: Is remote work productive?");
+      return `${model} returned ${out.subQuestions.length} sub-questions${reasoning ? ` (reasoning effort: ${reasoning.effort})` : ""}.`;
+    }),
+    timed("Web search", async () => {
+      const res = await webSearch({
+        questions: ["Latest research on remote work productivity"],
+        mode: "web",
+        maxResults: 3,
+      });
+      return `${res.sources.length} sources returned.`;
+    }),
+  ]);
 }
