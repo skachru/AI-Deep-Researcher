@@ -121,6 +121,8 @@ vi.mock("@/lib/tools/wikipedia", () => ({
   }),
 }));
 
+process.env.OPENROUTER_API_KEY ??= "sk-or-test";
+
 describe("research graph", () => {
   beforeEach(() => {
     analysisCalls = 0;
