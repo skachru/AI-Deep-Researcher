@@ -102,6 +102,10 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
 
 Each feature switches on when its environment variables are set; without them the app still runs research.
 
+**Setup check:** open `/setup` on your deployment. It tests the Anthropic key, the Google OAuth client ID/secret and
+redirect URI (against Google itself), the database and SMTP login, and says exactly what to fix. No secrets are shown;
+once someone has signed in, the page is admin-only.
+
 ## Demo mode
 
 1. `npm run record` with your API key set. It runs the three example queries and saves the event streams to
