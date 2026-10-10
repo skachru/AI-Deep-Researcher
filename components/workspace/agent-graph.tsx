@@ -1,9 +1,20 @@
 "use client";
 
-import { Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import {
+  Handle,
+  MarkerType,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  useNodesInitialized,
+  useReactFlow,
+  type Edge,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Check } from "lucide-react";
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { AGENTS } from "@/components/agent-meta";
 import type { AgentStatus, ResearchViewState } from "@/lib/client/reducer";
 import type { AgentId } from "@/lib/schemas/domain";
@@ -140,13 +151,57 @@ export function AgentGraph({ view }: { view: ResearchViewState }) {
   }, [view.handoffs, view.activeAgent, view.passes]);
 
   return (
-    <div className="h-[400px] w-full" aria-label="Agent graph">
+    <ReactFlowProvider>
+      <GraphCanvas nodes={nodes} edges={edges} />
+    </ReactFlowProvider>
+  );
+}
+
+const FIT = { padding: 0.12 } as const;
+
+/**
+ * React Flow only fits the view once, on mount. If the card is still being
+ * laid out or animated in at that moment (width 0), the nodes end up off-screen
+ * and the panel looks blank. Re-fit whenever the container resizes and once
+ * the nodes have been measured.
+ */
+function GraphCanvas({ nodes, edges }: { nodes: Array<AgentNode | SpacerNodeType>; edges: Edge[] }) {
+  const { fitView } = useReactFlow();
+  const nodesReady = useNodesInitialized();
+  const wrapper = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = wrapper.current;
+    if (!el) return;
+    let frame = 0;
+    const refit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (el.clientWidth > 0 && el.clientHeight > 0) void fitView(FIT);
+      });
+    };
+    const observer = new ResizeObserver(refit);
+    observer.observe(el);
+    refit();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [fitView]);
+
+  useEffect(() => {
+    if (nodesReady) void fitView(FIT);
+  }, [nodesReady, fitView]);
+
+  return (
+    <div ref={wrapper} className="h-[400px] w-full" aria-label="Agent graph">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.12 }}
+        fitViewOptions={FIT}
+        onInit={(instance) => void instance.fitView(FIT)}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}

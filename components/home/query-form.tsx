@@ -54,7 +54,8 @@ export function QueryForm() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            // Enter starts research; Shift+Enter adds a new line. Ignore Enter while an IME is composing.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               submit();
             }
@@ -89,8 +90,7 @@ export function QueryForm() {
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden items-center gap-1 text-[12px] text-subtle sm:flex">
-              <kbd className="rounded border border-border px-1 font-sans">⌘</kbd>
-              <CornerDownLeft className="size-3" />
+              <CornerDownLeft className="size-3" /> to search · Shift+Enter for new line
             </span>
             <Button variant="primary" size="md" onClick={submit} disabled={!canSubmit}>
               Research <ArrowRight />
