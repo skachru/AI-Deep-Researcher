@@ -30,6 +30,8 @@ export interface Source {
   credibility: number;
   credibilityRationale?: string;
   retrievedBy: string;
+  /** Preview image URL when the source provides one (e.g. Wikipedia lead image). */
+  image?: string | null;
   /** Retrieval pass (0 = first pass, 1 = multi-hop follow-up). */
   pass: number;
 }

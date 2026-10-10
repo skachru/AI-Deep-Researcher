@@ -68,16 +68,18 @@ Other scripts:
 
 ## Environment variables
 
-| Variable                                                     | Required    | Description                                                                                                                                                |
-| ------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                                          | Yes         | The only key needed. arXiv and Wikipedia are free; web search runs through Claude. Web search must be enabled for your organisation in the Claude Console. |
-| `LUMEN_MODEL`                                                | No          | Defaults to `claude-opus-5-5`.                                                                                                                             |
-| `NEXT_PUBLIC_DEMO_MODE`                                      | No          | `true` makes the example chips replay recorded runs instantly.                                                                                             |
-| `DATABASE_URL`                                               | For history | Postgres (Neon). Enables per-user history, the admin dashboard and rate limits. Tables are created automatically on first use.                             |
-| `AUTH_SECRET`                                                | For sign-in | 32+ random characters for signing sessions (`openssl rand -base64 48`).                                                                                    |
-| `ADMIN_EMAILS`                                               | No          | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                             |
-| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email   | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).               |
-| `RUNS_PER_HOUR`                                              | No          | Research runs allowed per visitor per hour (default 10; admins exempt).                                                                                    |
+| Variable                                                     | Required           | Description                                                                                                                                                |
+| ------------------------------------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                                          | Yes                | The only key needed. arXiv and Wikipedia are free; web search runs through Claude. Web search must be enabled for your organisation in the Claude Console. |
+| `LUMEN_MODEL`                                                | No                 | Defaults to `claude-opus-5-5`.                                                                                                                             |
+| `NEXT_PUBLIC_DEMO_MODE`                                      | No                 | `true` makes the example chips replay recorded runs instantly.                                                                                             |
+| `DATABASE_URL`                                               | For history        | Postgres (Neon). Enables per-user history, the admin dashboard and rate limits. Tables are created automatically on first use.                             |
+| `AUTH_SECRET`                                                | For sign-in        | 32+ random characters for signing sessions (`openssl rand -base64 48`).                                                                                    |
+| `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET`                    | For Google sign-in | OAuth client ("Web application") from Google Cloud. Redirect URI: `https://<domain>/api/auth/google/callback`.                                             |
+| `APP_URL`                                                    | No                 | Pins the public URL used for the Google redirect (otherwise taken from the request).                                                                       |
+| `ADMIN_EMAILS`                                               | No                 | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                             |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email          | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).               |
+| `RUNS_PER_HOUR`                                              | No                 | Research runs allowed per visitor per hour (default 10; admins exempt).                                                                                    |
 
 Variables are validated with Zod on first use (`lib/env.ts`), so a missing key produces a clear error instead of a crash.
 
@@ -86,7 +88,11 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
 - **Quick summary in seconds:** a `quick_summary` branch fans out from `START` in parallel with the Retriever and streams a
   short preliminary answer token by token. When the report is ready it is replaced by the source-verified `## Summary`.
 - **History:** every browser gets an anonymous id (httpOnly cookie), so `/history` works without sign-up. Signing in with
-  an emailed one-time link (`/login`) attaches that history to the email and syncs it across devices.
+  **Google** (OAuth code flow with PKCE; ID token verified against Google's keys) or an emailed one-time link attaches
+  that history to the account and syncs it across devices.
+- **Reliability panel:** every report (UI, HTML, PDF) opens with its evidence strength (Strong / Moderate / Limited), the
+  share of corroborated vs disputed claims and the source mix. Sources show thumbnails (Wikipedia images, page preview
+  images fetched through an SSRF-guarded `/api/og`, or the site icon).
 - **Downloads:** PDF, HTML and Markdown from the report view (`POST /api/export`; the PDF is rendered server-side with
   pdfmake, and the HTML is sanitised because report text derives from web content).
 - **Email:** after each report the user is asked for their email; `POST /api/email` sends the report as HTML with the PDF

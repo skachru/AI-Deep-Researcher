@@ -174,7 +174,11 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
 
             <div className="flex min-h-0 flex-col gap-4">
               <QuickSummary query={query} view={state} onOpenReport={() => setView("report")}>
-                {state.report && <EmailReport report={{ searchId: state.searchId, query, markdown: state.report }} />}
+                {state.report && (
+                  <EmailReport
+                    report={{ searchId: state.searchId, query, markdown: state.report, sources: state.sources }}
+                  />
+                )}
               </QuickSummary>
               <Card className="flex min-h-[320px] flex-1 flex-col overflow-hidden">
                 <CardHeader>

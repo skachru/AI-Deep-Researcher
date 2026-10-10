@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { SourceThumb } from "@/components/report/source-thumb";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,25 +44,28 @@ function SourcesList({ sources }: { sources: SourceSummary[] }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
-          className="group px-3.5 py-3"
+          className="group flex gap-3 px-3.5 py-3"
         >
-          <div className="flex items-center gap-1.5 text-[11.5px] text-subtle">
-            <span className="font-medium text-muted tabular-nums">[{s.id.slice(1)}]</span>
-            <SourceTypeBadge type={s.type} />
-            <span className="truncate">{domainOf(s.url)}</span>
-            {s.publishedDate && <span className="ml-auto shrink-0 tabular-nums">{s.publishedDate}</span>}
+          <SourceThumb source={s} className="size-14 shrink-0 rounded-md border border-border" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[11.5px] text-subtle">
+              <span className="font-medium text-muted tabular-nums">[{s.id.slice(1)}]</span>
+              <SourceTypeBadge type={s.type} />
+              <span className="truncate">{domainOf(s.url)}</span>
+              {s.publishedDate && <span className="ml-auto shrink-0 tabular-nums">{s.publishedDate}</span>}
+            </div>
+            <a
+              href={s.url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 line-clamp-2 text-[13px] leading-snug font-medium hover:text-accent"
+            >
+              {s.title}
+              <ExternalLink className="ml-1 inline size-3 opacity-0 transition-opacity group-hover:opacity-60" />
+            </a>
+            <CredibilityBar value={s.credibility} className="mt-2" />
+            {s.credibilityRationale && <p className="mt-1 text-[11.5px] text-subtle">{s.credibilityRationale}</p>}
           </div>
-          <a
-            href={s.url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 line-clamp-2 text-[13px] leading-snug font-medium hover:text-accent"
-          >
-            {s.title}
-            <ExternalLink className="ml-1 inline size-3 opacity-0 transition-opacity group-hover:opacity-60" />
-          </a>
-          <CredibilityBar value={s.credibility} className="mt-2" />
-          {s.credibilityRationale && <p className="mt-1 text-[11.5px] text-subtle">{s.credibilityRationale}</p>}
         </motion.li>
       ))}
     </ul>

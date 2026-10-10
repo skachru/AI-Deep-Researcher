@@ -2,6 +2,7 @@ import { Lexer, type Token, type Tokens } from "marked";
 import type { Content, ContentText, TDocumentDefinitions } from "pdfmake/interfaces";
 import { plainClaims } from "@/lib/report/markdown";
 import type { ReportDocument } from "@/lib/report/html";
+import { computeReliability, STRENGTH_COPY, stripTitle } from "@/lib/report/reliability";
 
 /** Markdown → pdfmake document definition. Pure (unit-tested). */
 
@@ -100,23 +101,118 @@ function block(t: Token): Content[] {
   }
 }
 
+const STRENGTH_COLOR = { Strong: "#2F9E6C", Moderate: "#5E6AD2", Limited: "#C27A12" } as const;
+
+function coverBlock(doc: ReportDocument): Content {
+  const count = doc.sources?.length;
+  return {
+    table: {
+      widths: ["*"],
+      body: [
+        [
+          {
+            stack: [
+              { text: "LUMEN RESEARCH REPORT", fontSize: 8, bold: true, color: ACCENT, characterSpacing: 1 },
+              { text: doc.query, fontSize: 19, bold: true, margin: [0, 6, 0, 4], lineHeight: 1.15 },
+              {
+                text: `Verified across ${count ?? "multiple"} sources by four cooperating AI agents · ${doc.generatedAt.toUTCString()}`,
+                fontSize: 8.5,
+                color: "#6B6F7B",
+              },
+            ],
+            fillColor: "#EEF0FC",
+            margin: [16, 16, 16, 16],
+          },
+        ],
+      ],
+    },
+    layout: "noBorders",
+    margin: [0, 0, 0, 14],
+  };
+}
+
+function reliabilityBlock(doc: ReportDocument): Content {
+  const r = computeReliability(doc.markdown, doc.sources ?? []);
+  const { corroborated, singleSource, disputed, total } = r.claims;
+  const stat = (value: string | number, label: string): Content => ({
+    stack: [
+      { text: String(value), fontSize: 15, bold: true },
+      { text: label, fontSize: 8, color: "#9A9EA8" },
+    ],
+  });
+  const width = 495;
+  let x = 0;
+  const bar = [
+    [corroborated, "#2F9E6C"],
+    [singleSource, "#D6D6DC"],
+    [disputed, "#D14A4A"],
+  ]
+    .filter(([n]) => Number(n) > 0)
+    .map(([n, color]) => {
+      const w = (Number(n) / total) * width;
+      const rect = { type: "rect" as const, x, y: 0, w: Math.max(w - 2, 1), h: 6, color: String(color) };
+      x += w;
+      return rect;
+    });
+  return {
+    table: {
+      widths: ["*"],
+      body: [
+        [
+          {
+            stack: [
+              {
+                text: [
+                  { text: `${r.strength} evidence  `, bold: true, color: STRENGTH_COLOR[r.strength] },
+                  { text: STRENGTH_COPY[r.strength], color: "#6B6F7B", fontSize: 9 },
+                ],
+              },
+              {
+                columns: [
+                  stat(r.sources.total, "sources checked"),
+                  stat(`${total ? Math.round((corroborated / total) * 100) : 0}%`, "claims corroborated"),
+                  stat(disputed, "disputed claims"),
+                  stat(r.sources.avgCredibility, "avg. source credibility"),
+                ],
+                margin: [0, 10, 0, 0],
+              },
+              ...(total
+                ? [
+                    { canvas: bar, margin: [0, 10, 0, 0] } as Content,
+                    {
+                      text: `Corroborated ${corroborated} · Single-source ${singleSource} · Disputed ${disputed}`,
+                      fontSize: 8,
+                      color: "#6B6F7B",
+                      margin: [0, 4, 0, 0],
+                    } as Content,
+                  ]
+                : []),
+            ],
+            fillColor: "#FAFAFB",
+            margin: [12, 12, 12, 12],
+          },
+        ],
+      ],
+    },
+    layout: { hLineColor: () => "#E6E6EA", vLineColor: () => "#E6E6EA", hLineWidth: () => 0.6, vLineWidth: () => 0.6 },
+    margin: [0, 0, 0, 8],
+  };
+}
+
 export function reportToPdfDefinition(doc: ReportDocument): TDocumentDefinitions {
-  const tokens = new Lexer({ gfm: true }).lex(plainClaims(doc.markdown));
+  const tokens = new Lexer({ gfm: true }).lex(plainClaims(stripTitle(doc.markdown)));
   return {
     info: { title: doc.query, creator: "Lumen", producer: "Lumen" },
-    pageMargins: [40, 50, 40, 50],
+    pageMargins: [50, 50, 50, 50],
     footer: (page, pages) => ({
       columns: [
         { text: "Lumen · multi-agent research report", color: "#9A9EA8" },
         { text: `${page} / ${pages}`, alignment: "right", color: "#9A9EA8" },
       ],
       fontSize: 8,
-      margin: [40, 16, 40, 0],
+      margin: [50, 16, 50, 0],
     }),
-    content: [
-      { text: `Generated ${doc.generatedAt.toUTCString()}`, fontSize: 8, color: "#9A9EA8", margin: [0, 0, 0, 10] },
-      ...tokens.flatMap(block),
-    ],
+    content: [coverBlock(doc), reliabilityBlock(doc), ...tokens.flatMap(block)],
     defaultStyle: { font: "Roboto", fontSize: 10.5, lineHeight: 1.35, color: "#1B1B1F" },
     styles: {
       h1: { fontSize: 18, bold: true, margin: [0, 0, 0, 10] },

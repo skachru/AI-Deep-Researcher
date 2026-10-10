@@ -33,6 +33,7 @@ export function parseWikiSummary(json: unknown, fullText: string): RawSource | n
     extract?: unknown;
     timestamp?: unknown;
     content_urls?: { desktop?: { page?: unknown } };
+    thumbnail?: { source?: unknown };
   };
   if (typeof s.title !== "string" || typeof s.extract !== "string") return null;
   const url = typeof s.content_urls?.desktop?.page === "string" ? s.content_urls.desktop.page : "";
@@ -45,6 +46,8 @@ export function parseWikiSummary(json: unknown, fullText: string): RawSource | n
     snippet: s.extract.slice(0, 280),
     content: fullText || s.extract,
     retrievedBy: "Wikipedia REST API",
+    image:
+      typeof s.thumbnail?.source === "string" && s.thumbnail.source.startsWith("https://") ? s.thumbnail.source : null,
   };
 }
 

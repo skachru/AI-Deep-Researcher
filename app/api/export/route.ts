@@ -16,7 +16,12 @@ export async function POST(request: Request): Promise<Response> {
   const resolved = await resolveReport(await getViewer(), parsed.data.report);
   if ("error" in resolved) return Response.json({ error: resolved.error }, { status: resolved.status });
 
-  const doc = { query: resolved.query, markdown: resolved.markdown, generatedAt: new Date() };
+  const doc = {
+    query: resolved.query,
+    markdown: resolved.markdown,
+    sources: resolved.sources,
+    generatedAt: new Date(),
+  };
   const name = fileSlug(resolved.query);
 
   if (parsed.data.format === "html") {

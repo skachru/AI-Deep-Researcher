@@ -34,7 +34,12 @@ export async function POST(request: Request): Promise<Response> {
   if ("error" in resolved) return Response.json({ error: resolved.error }, { status: resolved.status });
 
   const to = normaliseEmail(parsed.data.email);
-  const doc = { query: resolved.query, markdown: resolved.markdown, generatedAt: new Date() };
+  const doc = {
+    query: resolved.query,
+    markdown: resolved.markdown,
+    sources: resolved.sources,
+    generatedAt: new Date(),
+  };
   try {
     const pdf = await renderReportPdf(doc);
     await sendMail({

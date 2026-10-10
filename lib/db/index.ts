@@ -46,6 +46,15 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>): Promise<void>
       anon_id text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS users (
+      email text PRIMARY KEY,
+      name text,
+      picture text,
+      provider text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      last_login_at timestamptz NOT NULL DEFAULT now(),
+      login_count integer NOT NULL DEFAULT 1
+    )`;
     await sql`CREATE TABLE IF NOT EXISTS login_tokens (
       token_hash text PRIMARY KEY,
       email text NOT NULL,

@@ -27,7 +27,7 @@ export function LoginForm({ next }: { next: string }) {
 
   if (state === "sent") {
     return (
-      <div className="mt-6 flex items-start gap-3 rounded-lg border border-success/30 bg-success-soft p-4">
+      <div className="flex items-start gap-3 rounded-lg border border-success/30 bg-success-soft p-4">
         <MailCheck className="mt-0.5 size-4 shrink-0 text-success" />
         <p className="text-[13px]">
           Check <b>{email}</b> for your sign-in link. It expires in 15 minutes.
@@ -37,7 +37,7 @@ export function LoginForm({ next }: { next: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 space-y-3">
+    <form onSubmit={submit} className="space-y-3">
       <input
         type="email"
         required

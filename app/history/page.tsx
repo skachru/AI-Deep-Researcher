@@ -2,6 +2,7 @@ import { CheckCircle2, Clock, Library, XCircle } from "lucide-react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
+import { isGoogleConfigured } from "@/lib/auth/google";
 import { getViewer, isAuthConfigured } from "@/lib/auth/session";
 import { isDbConfigured } from "@/lib/db";
 import { listSearches } from "@/lib/db/searches";
@@ -18,7 +19,7 @@ function when(iso: string) {
 export default async function HistoryPage() {
   const viewer = await getViewer();
   const searches = isDbConfigured() ? await listSearches(viewer) : [];
-  const canSignIn = isAuthConfigured() && isDbConfigured() && isEmailConfigured();
+  const canSignIn = isAuthConfigured() && (isGoogleConfigured() || (isDbConfigured() && isEmailConfigured()));
 
   return (
     <div className="min-h-dvh">
@@ -30,7 +31,7 @@ export default async function HistoryPage() {
           {!viewer.email && canSignIn && (
             <>
               <Link href="/login?next=/history" className="text-accent hover:underline">
-                Sign in with your email
+                Sign in
               </Link>{" "}
               to keep it across devices.
             </>

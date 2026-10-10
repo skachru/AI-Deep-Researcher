@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 
 export interface Me {
   email: string | null;
+  name: string | null;
+  picture: string | null;
   isAdmin: boolean;
-  features: { history: boolean; email: boolean; signIn: boolean };
+  features: { history: boolean; email: boolean; signIn: boolean; googleSignIn: boolean; emailSignIn: boolean };
 }
 
 let cache: Promise<Me | null> | null = null;

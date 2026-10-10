@@ -23,22 +23,33 @@ export function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export async function createSessionToken(email: string): Promise<string> {
+export interface SessionUser {
+  email: string;
+  name?: string;
+  picture?: string;
+}
+
+export async function createSessionToken(user: SessionUser): Promise<string> {
   const key = secretKey();
   if (!key) throw new Error("AUTH_SECRET is not configured (min 32 characters).");
-  return new SignJWT({ email })
+  return new SignJWT({ email: user.email, name: user.name, picture: user.picture })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_S}s`)
     .sign(key);
 }
 
-export async function verifySessionToken(token: string | undefined): Promise<string | null> {
+export async function verifySessionToken(token: string | undefined): Promise<SessionUser | null> {
   const key = secretKey();
   if (!token || !key) return null;
   try {
     const { payload } = await jwtVerify(token, key, { algorithms: ["HS256"] });
-    return typeof payload.email === "string" ? payload.email : null;
+    if (typeof payload.email !== "string") return null;
+    return {
+      email: payload.email,
+      name: typeof payload.name === "string" ? payload.name : undefined,
+      picture: typeof payload.picture === "string" ? payload.picture : undefined,
+    };
   } catch {
     return null;
   }
@@ -48,6 +59,13 @@ export async function verifySessionToken(token: string | undefined): Promise<str
 export async function getViewer(): Promise<Viewer> {
   const jar = await cookies();
   const anonId = jar.get(ANON_COOKIE)?.value ?? "unknown";
-  const email = await verifySessionToken(jar.get(SESSION_COOKIE)?.value);
-  return { anonId, email, isAdmin: email !== null && adminEmails().includes(email) };
+  const user = await verifySessionToken(jar.get(SESSION_COOKIE)?.value);
+  const email = user?.email ?? null;
+  return {
+    anonId,
+    email,
+    name: user?.name ?? null,
+    picture: user?.picture ?? null,
+    isAdmin: email !== null && adminEmails().includes(email),
+  };
 }

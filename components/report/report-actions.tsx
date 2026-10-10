@@ -4,6 +4,7 @@ import { Check, Copy, FileCode2, FileDown, FileText, Loader2, Mail, Send } from 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { exportMarkdown } from "@/lib/client/report";
+import type { SourceSummary } from "@/lib/schemas/domain";
 import { useMe } from "@/lib/client/useMe";
 import { slugify } from "@/lib/demo/examples";
 import { cn } from "@/lib/utils";
@@ -12,11 +13,22 @@ export interface ReportRef {
   searchId: string | null;
   query: string;
   markdown: string;
+  sources: SourceSummary[];
 }
 
 /** Body sent to /api/export and /api/email: the saved id when we have one, else the content. */
 function refBody(ref: ReportRef) {
-  return ref.searchId ? { searchId: ref.searchId } : { query: ref.query, markdown: ref.markdown };
+  if (ref.searchId) return { searchId: ref.searchId };
+  const sources = ref.sources.map(({ id, title, url, type, credibility, publishedDate, image }) => ({
+    id,
+    title,
+    url,
+    type,
+    credibility,
+    publishedDate,
+    image,
+  }));
+  return { query: ref.query, markdown: ref.markdown, sources };
 }
 
 function saveBlob(blob: Blob, filename: string) {

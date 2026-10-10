@@ -4,6 +4,8 @@ import type { SourceSummary, Usage } from "@/lib/schemas/domain";
 export interface Viewer {
   anonId: string;
   email: string | null;
+  name?: string | null;
+  picture?: string | null;
   isAdmin: boolean;
 }
 

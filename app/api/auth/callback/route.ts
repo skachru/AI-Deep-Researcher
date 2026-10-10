@@ -4,6 +4,7 @@ import { ANON_COOKIE, SESSION_COOKIE, SESSION_TTL_S } from "@/lib/auth/constants
 import { consumeLoginToken } from "@/lib/auth/login";
 import { createSessionToken } from "@/lib/auth/session";
 import { claimAnonymousSearches } from "@/lib/db/searches";
+import { upsertUser } from "@/lib/db/users";
 
 export const runtime = "nodejs";
 
@@ -20,9 +21,10 @@ export async function GET(request: Request): Promise<Response> {
   const jar = await cookies();
   const anonId = jar.get(ANON_COOKIE)?.value;
   if (anonId) await claimAnonymousSearches(anonId, email).catch(() => undefined);
+  await upsertUser({ email, provider: "email" }).catch(() => undefined);
 
   const response = NextResponse.redirect(new URL(next, request.url));
-  response.cookies.set(SESSION_COOKIE, await createSessionToken(email), {
+  response.cookies.set(SESSION_COOKIE, await createSessionToken({ email }), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
 import { getAnalytics } from "@/lib/db/analytics";
+import { listUsers } from "@/lib/db/users";
 import { formatDuration, formatTokens } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export default async function AdminPage() {
     );
   }
 
-  const data = await getAnalytics();
+  const [data, users] = await Promise.all([getAnalytics(), listUsers()]);
   return (
     <div className="min-h-dvh">
       <SiteHeader />
@@ -150,6 +151,39 @@ export default async function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </Card>
+            <Card className="overflow-hidden">
+              <CardHeader>
+                Signed-in users
+                <span className="text-[12px] font-normal text-subtle tabular-nums">{users.length}</span>
+              </CardHeader>
+              {users.length === 0 ? (
+                <p className="p-4 text-[13px] text-subtle">Nobody has signed in yet.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {users.map((u) => (
+                    <li key={u.email} className="flex items-center gap-3 px-4 py-2.5 text-[12.5px]">
+                      {u.picture ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- Google avatar
+                        <img src={u.picture} alt="" referrerPolicy="no-referrer" className="size-7 rounded-full" />
+                      ) : (
+                        <span className="grid size-7 place-items-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent uppercase">
+                          {u.email[0]}
+                        </span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{u.name ?? u.email}</div>
+                        <div className="truncate text-subtle">{u.email}</div>
+                      </div>
+                      <Badge>{u.provider === "google" ? "Google" : "Email link"}</Badge>
+                      <span className="w-24 text-right text-muted tabular-nums">{u.searches} searches</span>
+                      <span className="hidden w-32 text-right text-subtle tabular-nums sm:block">
+                        {when(u.lastLoginAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Card>
           </>
         )}

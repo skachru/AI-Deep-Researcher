@@ -9,4 +9,6 @@ export interface RawSource {
   snippet: string;
   content: string;
   retrievedBy: string;
+  /** Preview image URL when the source provides one (e.g. Wikipedia lead image). */
+  image?: string | null;
 }

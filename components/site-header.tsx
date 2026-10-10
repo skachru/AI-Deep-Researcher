@@ -20,6 +20,9 @@ export function SiteHeader({ children }: { children?: React.ReactNode }) {
       <div className="mx-auto flex h-12 max-w-[1440px] items-center gap-3 px-4">
         <Logo />
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">{children}</div>
+        <Link href="/how-it-works" className="hidden text-[13px] text-muted hover:text-foreground sm:block">
+          How it works
+        </Link>
         <a
           href="https://github.com/skachru/AI-Deep-Researcher"
           target="_blank"
