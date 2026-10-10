@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>ArXiv Query</title>
+  <entry>
+    <id>http://arxiv.org/abs/2302.06590v1</id>
+    <published>2023-02-13T18:00:00Z</published>
+    <title>The Impact of AI on Developer
+      Productivity: Evidence from GitHub Copilot</title>
+    <summary>  Generative AI tools hold promise to increase human productivity.
+      This paper presents results from a controlled experiment.  </summary>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00001v2</id>
+    <published>2024-01-02T00:00:00Z</published>
+    <title>Second Paper</title>
+    <summary>Short abstract.</summary>
+  </entry>
+</feed>
