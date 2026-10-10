@@ -20,7 +20,7 @@ export async function quickSummaryNode(
   state: ResearchStateType,
   config: LangGraphRunnableConfig,
 ): Promise<ResearchStateUpdate> {
-  const model = createModel({ maxTokens: 1200, effort: "low", timeoutMs: 30_000 });
+  const model = createModel({ maxTokens: 1200, timeoutMs: 30_000 });
   let text = "";
   let usage: Usage = ZERO_USAGE;
   try {

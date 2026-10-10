@@ -1,8 +1,11 @@
 import { z } from "zod";
 
+export const DEFAULT_MODEL = "qwen/qwen3.8-flash";
+
 const ServerEnvSchema = z.object({
-  ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required"),
-  LUMEN_MODEL: z.string().default("claude-opus-5-5"),
+  OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
+  /** Any OpenRouter model that supports structured outputs (response_format) — see /setup. */
+  OPENROUTER_MODEL: z.string().default(DEFAULT_MODEL),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;

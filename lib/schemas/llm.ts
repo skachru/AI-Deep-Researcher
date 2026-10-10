@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Zod schemas used with `withStructuredOutput(..., { method: "jsonSchema" })`.
- * They are sent to Claude as JSON Schema (structured outputs), so we avoid
+ * They are sent through OpenRouter as JSON Schema (`response_format`), so we avoid
  * numeric/length constraints the API does not support and clamp in code instead.
  */
 

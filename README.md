@@ -1,7 +1,7 @@
 # Lumen — Multi-Agent Deep Researcher
 
 Lumen turns a hard question into a cited research report in a few minutes. Four cooperating agents, orchestrated as a
-**LangGraph** state machine and powered by **Claude Opus 5.5**, break the question down, search the web, news, arXiv and
+**LangGraph** state machine and powered by any LLM on **OpenRouter**, break the question down, search the web, news, arXiv and
 Wikipedia in parallel, rank evidence with **BM25**, cross-check sources for contradictions and credibility, loop back
 for targeted follow-up searches when they find important gaps, form calibrated hypotheses, and write a structured
 report with inline citations. Every step streams live to a Linear-style workspace, so you can watch the agents work.
@@ -20,8 +20,8 @@ flowchart TD
     B --> END([Cited report])
 
     subgraph Tools["Retriever tools (run in parallel)"]
-      W[Claude web search]
-      N[Claude web search — news]
+      W[OpenRouter web search]
+      N[OpenRouter web search — news]
       X[arXiv API]
       K[Wikipedia API]
     end
@@ -35,25 +35,25 @@ flowchart TD
 - **Streaming:** agents emit typed events (`lib/events/types.ts`) through LangGraph's custom stream
   (`streamMode: "custom"`); `app/api/research/route.ts` forwards them to the browser as Server-Sent Events.
 - **Structured output:** every agent except the report prose uses Zod schemas with
-  `withStructuredOutput(schema, { method: "jsonSchema" })` (Claude structured outputs).
+  `withStructuredOutput(schema, { method: "jsonSchema" })` (structured outputs via OpenRouter `response_format`, with `provider.require_parameters` so requests only go to providers that support it).
 - **Safety:** retrieved content is wrapped as untrusted data and the prompts tell agents never to follow instructions
   inside it; model-cited source ids are validated against real sources.
 
 ## The four agents
 
-| Agent                | File                      | What it does                                                                                                                                                                                                                                                                                                                                      |
-| -------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Contextual Retriever | `lib/agents/retriever.ts` | Splits the query into 3–5 sub-questions; runs Claude web search (`web_search_20260209`), a news-focused search, arXiv and Wikipedia in parallel; dedupes, caps sources (~12–15) with a balanced mix, chunks text and ranks chunks per sub-question with LangChain's `BM25Retriever`. On the follow-up pass it turns gaps into targeted questions. |
-| Critical Analysis    | `lib/agents/analyst.ts`   | Summarises evidence per sub-question, labels claims Corroborated / Single-source / Disputed, flags contradictions (both claims and source ids), scores credibility (type, domain, recency, model judgement, corroboration) and lists gaps by importance.                                                                                          |
-| Insight Generation   | `lib/agents/insight.ts`   | Reasons step by step to produce 3–5 hypotheses with High/Medium/Low confidence, the reasoning chain and evidence ids.                                                                                                                                                                                                                             |
-| Report Builder       | `lib/agents/reporter.ts`  | Writes Executive Summary, Key Findings, Contradictions & Open Questions, Insights & Hypotheses with `[n]` citations; Methodology (including failed sources) and References are generated deterministically.                                                                                                                                       |
+| Agent                | File                      | What it does                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contextual Retriever | `lib/agents/retriever.ts` | Splits the query into 3–5 sub-questions; runs OpenRouter web search (the `openrouter:web_search` server tool), a news-focused search, arXiv and Wikipedia in parallel; dedupes, caps sources (~12–15) with a balanced mix, chunks text and ranks chunks per sub-question with LangChain's `BM25Retriever`. On the follow-up pass it turns gaps into targeted questions. |
+| Critical Analysis    | `lib/agents/analyst.ts`   | Summarises evidence per sub-question, labels claims Corroborated / Single-source / Disputed, flags contradictions (both claims and source ids), scores credibility (type, domain, recency, model judgement, corroboration) and lists gaps by importance.                                                                                                                |
+| Insight Generation   | `lib/agents/insight.ts`   | Reasons step by step to produce 3–5 hypotheses with High/Medium/Low confidence, the reasoning chain and evidence ids.                                                                                                                                                                                                                                                   |
+| Report Builder       | `lib/agents/reporter.ts`  | Writes Executive Summary, Key Findings, Contradictions & Open Questions, Insights & Hypotheses with `[n]` citations; Methodology (including failed sources) and References are generated deterministically.                                                                                                                                                             |
 
 ## Setup
 
 ```bash
 git clone https://github.com/skachru/AI-Deep-Researcher.git && cd AI-Deep-Researcher
 npm install
-cp .env.example .env.local   # then add your ANTHROPIC_API_KEY
+cp .env.example .env.local   # then add your OPENROUTER_API_KEY
 npm run dev                   # http://localhost:3000
 ```
 
@@ -68,18 +68,18 @@ Other scripts:
 
 ## Environment variables
 
-| Variable                                                     | Required           | Description                                                                                                                                                |
-| ------------------------------------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                                          | Yes                | The only key needed. arXiv and Wikipedia are free; web search runs through Claude. Web search must be enabled for your organisation in the Claude Console. |
-| `LUMEN_MODEL`                                                | No                 | Defaults to `claude-opus-5-5`.                                                                                                                             |
-| `NEXT_PUBLIC_DEMO_MODE`                                      | No                 | `true` makes the example chips replay recorded runs instantly.                                                                                             |
-| `DATABASE_URL`                                               | For history        | Postgres (Neon). Enables per-user history, the admin dashboard and rate limits. Tables are created automatically on first use.                             |
-| `AUTH_SECRET`                                                | For sign-in        | 32+ random characters for signing sessions (`openssl rand -base64 48`).                                                                                    |
-| `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET`                    | For Google sign-in | OAuth client ("Web application") from Google Cloud. Redirect URI: `https://<domain>/api/auth/google/callback`.                                             |
-| `APP_URL`                                                    | No                 | Pins the public URL used for the Google redirect (otherwise taken from the request).                                                                       |
-| `ADMIN_EMAILS`                                               | No                 | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                             |
-| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email          | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).               |
-| `RUNS_PER_HOUR`                                              | No                 | Research runs allowed per visitor per hour (default 10; admins exempt).                                                                                    |
+| Variable                                                     | Required           | Description                                                                                                                                                     |
+| ------------------------------------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                                         | Yes                | The only key needed (openrouter.ai/keys). arXiv and Wikipedia are free; web search runs through OpenRouter's web search tool (billed per result by OpenRouter). |
+| `OPENROUTER_MODEL`                                           | No                 | Any OpenRouter model id with structured outputs + tools. Defaults to `qwen/qwen3.8-flash` (low cost). `/setup` shows its price and capabilities.                |
+| `NEXT_PUBLIC_DEMO_MODE`                                      | No                 | `true` makes the example chips replay recorded runs instantly.                                                                                                  |
+| `DATABASE_URL`                                               | For history        | Postgres (Neon). Enables per-user history, the admin dashboard and rate limits. Tables are created automatically on first use.                                  |
+| `AUTH_SECRET`                                                | For sign-in        | 32+ random characters for signing sessions (`openssl rand -base64 48`).                                                                                         |
+| `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET`                    | For Google sign-in | OAuth client ("Web application") from Google Cloud. Redirect URI: `https://<domain>/api/auth/google/callback`.                                                  |
+| `APP_URL`                                                    | No                 | Pins the public URL used for the Google redirect (otherwise taken from the request).                                                                            |
+| `ADMIN_EMAILS`                                               | No                 | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                                  |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email          | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).                    |
+| `RUNS_PER_HOUR`                                              | No                 | Research runs allowed per visitor per hour (default 10; admins exempt).                                                                                         |
 
 Variables are validated with Zod on first use (`lib/env.ts`), so a missing key produces a clear error instead of a crash.
 
@@ -102,7 +102,7 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
 
 Each feature switches on when its environment variables are set; without them the app still runs research.
 
-**Setup check:** open `/setup` on your deployment. It tests the Anthropic key, the Google OAuth client ID/secret and
+**Setup check:** open `/setup` on your deployment. It tests the OpenRouter key (and remaining credit), the chosen model's capabilities, the Google OAuth client ID/secret and
 redirect URI (against Google itself), the database and SMTP login, and says exactly what to fix. No secrets are shown;
 once someone has signed in, the page is admin-only.
 
@@ -117,7 +117,7 @@ once someone has signed in, the page is admin-only.
 ## Deploy to Vercel
 
 1. Push this repo to GitHub and import it at [vercel.com/new](https://vercel.com/new) (framework: Next.js, defaults are fine).
-2. Add `ANTHROPIC_API_KEY` (and optionally `NEXT_PUBLIC_DEMO_MODE=true`) under **Settings → Environment Variables**.
+2. Add `OPENROUTER_API_KEY` (and optionally `NEXT_PUBLIC_DEMO_MODE=true`) under **Settings → Environment Variables**.
    For history and admin, add a database under **Storage → Create Database → Neon** (it sets `DATABASE_URL`), then add
    `AUTH_SECRET`, `ADMIN_EMAILS` and the `SMTP_*` variables.
 3. Deploy. The research route sets `maxDuration = 300` seconds, the maximum on the Hobby plan with Fluid compute
@@ -133,7 +133,7 @@ _Add screenshots of the home page, live workspace and report here._
 
 ## Limitations
 
-- Web search returns the passages Claude cited, not full page text, so evidence from web pages is excerpt-level.
+- Web search returns excerpts of the pages the model cited, not full page text, so evidence from web pages is excerpt-level.
 - Credibility scoring is heuristic plus model judgement; it is a guide, not a fact-check.
 - Standard depth can approach the 300-second Hobby limit on complex questions.
 - No persistence: runs are not saved beyond the browser session (except recordings).

@@ -2,7 +2,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { emit } from "@/lib/events/emit";
 import type { ResearchStateType, ResearchStateUpdate } from "@/lib/graph/state";
-import { budgetFor, createModel, textOf, usageFrom } from "@/lib/llm";
+import { createModel, textOf, usageFrom } from "@/lib/llm";
 import type { Insight, Source } from "@/lib/schemas/domain";
 import { sourceNumber, toSummary } from "@/lib/schemas/domain";
 import { domainOf, renderSourceIndex } from "@/lib/agents/context";
@@ -68,7 +68,7 @@ export async function reporterAgent(
   const startedAt = Date.now();
   emit(config, { type: "agent_started", agent: "reporter", message: "Drafting the cited research report" });
 
-  const model = createModel({ maxTokens: 16_000, effort: budgetFor(state.depth).effort, timeoutMs: 150_000 });
+  const model = createModel({ maxTokens: 16_000, timeoutMs: 150_000 });
   const response = await model.invoke(
     [
       new SystemMessage(SYSTEM_PROMPT),

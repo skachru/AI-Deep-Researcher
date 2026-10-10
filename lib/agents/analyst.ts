@@ -3,7 +3,7 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { emit } from "@/lib/events/emit";
 import type { ResearchStateType, ResearchStateUpdate } from "@/lib/graph/state";
 import { importantGaps, routeAfterAnalysis } from "@/lib/graph/routing";
-import { budgetFor, createModel, UNTRUSTED_NOTICE, usageFrom } from "@/lib/llm";
+import { createModel, UNTRUSTED_NOTICE, usageFrom } from "@/lib/llm";
 import type { Contradiction, Finding, Source } from "@/lib/schemas/domain";
 import { toSummary } from "@/lib/schemas/domain";
 import { AnalysisSchema, type Analysis } from "@/lib/schemas/llm";
@@ -65,15 +65,15 @@ export async function analystAgent(
   config: LangGraphRunnableConfig,
 ): Promise<ResearchStateUpdate> {
   const startedAt = Date.now();
-  const budget = budgetFor(state.depth);
   emit(config, {
     type: "agent_started",
     agent: "analyst",
     message: `Cross-checking ${state.evidence.length} evidence chunks from ${state.sources.length} sources`,
   });
 
-  const model = createModel({ maxTokens: 16_000, effort: budget.effort }).withStructuredOutput(AnalysisSchema, {
+  const model = createModel({ maxTokens: 16_000 }).withStructuredOutput(AnalysisSchema, {
     method: "jsonSchema",
+    strict: true,
     includeRaw: true,
   });
   const { parsed, raw } = await model.invoke(

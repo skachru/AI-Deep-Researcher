@@ -1,8 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
 import nodemailer from "nodemailer";
 import { redirectUri } from "@/lib/auth/google";
 import { adminEmails } from "@/lib/auth/session";
 import { db } from "@/lib/db";
+import { DEFAULT_MODEL } from "@/lib/env";
+import { OPENROUTER_BASE_URL } from "@/lib/llm";
 
 export type CheckStatus = "ok" | "warn" | "fail" | "off";
 
@@ -16,35 +17,100 @@ export interface Check {
 
 const describe = (err: unknown) => (err instanceof Error ? err.message : String(err)).slice(0, 300);
 
-async function checkAnthropic(): Promise<Check> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  const model = process.env.LUMEN_MODEL ?? "claude-opus-5-5";
-  if (!key)
-    return {
-      group: "Research",
-      name: "Anthropic API key",
-      status: "fail",
-      detail: "ANTHROPIC_API_KEY is not set.",
-      fix: "Add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables.",
-    };
-  try {
-    // Reading the model's metadata validates the key and model access without spending tokens.
-    await new Anthropic({ apiKey: key, timeout: 10_000, maxRetries: 0 }).models.retrieve(model);
-    return {
-      group: "Research",
-      name: "Anthropic API key",
-      status: "ok",
-      detail: `Key works and has access to ${model}.`,
-    };
-  } catch (err) {
-    return {
-      group: "Research",
-      name: "Anthropic API key",
-      status: "fail",
-      detail: describe(err),
-      fix: "Check the key in console.anthropic.com (and that it has credit).",
-    };
+async function checkOpenRouter(): Promise<Check[]> {
+  const key = process.env.OPENROUTER_API_KEY;
+  const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  if (!key) {
+    return [
+      {
+        group: "Research",
+        name: "OpenRouter API key",
+        status: "fail",
+        detail: "OPENROUTER_API_KEY is not set.",
+        fix: "Create a key at openrouter.ai/keys and add it as OPENROUTER_API_KEY in Vercel → Settings → Environment Variables.",
+      },
+    ];
   }
+  const checks: Check[] = [];
+  try {
+    const res = await fetch(`${OPENROUTER_BASE_URL}/key`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      data?: { limit?: number | null; limit_remaining?: number | null; usage?: number; is_free_tier?: boolean };
+      error?: { message?: string };
+    };
+    if (!res.ok || !body.data) {
+      checks.push({
+        group: "Research",
+        name: "OpenRouter API key",
+        status: "fail",
+        detail: body.error?.message ?? `OpenRouter returned HTTP ${res.status}.`,
+        fix: "Check the key at openrouter.ai/keys (it may be disabled or mistyped).",
+      });
+    } else {
+      const remaining = body.data.limit_remaining;
+      const low = typeof remaining === "number" && remaining < 1;
+      checks.push({
+        group: "Research",
+        name: "OpenRouter API key",
+        status: low ? "warn" : "ok",
+        detail:
+          `Key works. Used $${(body.data.usage ?? 0).toFixed(2)}` +
+          (typeof remaining === "number"
+            ? `, $${remaining.toFixed(2)} left on this key's limit.`
+            : " (no spending limit on this key)."),
+        fix: low ? "Top up credits at openrouter.ai/credits or raise the key's limit." : undefined,
+      });
+    }
+  } catch (err) {
+    checks.push({
+      group: "Research",
+      name: "OpenRouter API key",
+      status: "warn",
+      detail: `Could not reach OpenRouter: ${describe(err)}`,
+    });
+  }
+
+  try {
+    const res = await fetch(`${OPENROUTER_BASE_URL}/models`, { signal: AbortSignal.timeout(10_000) });
+    const { data } = (await res.json()) as {
+      data?: { id: string; supported_parameters?: string[]; pricing?: { prompt?: string; completion?: string } }[];
+    };
+    const found = data?.find((m) => m.id === model);
+    if (!found) {
+      checks.push({
+        group: "Research",
+        name: "Model",
+        status: "fail",
+        detail: `"${model}" is not an OpenRouter model id.`,
+        fix: "Pick a model on openrouter.ai/models that supports structured outputs and tools, and set OPENROUTER_MODEL to its id (e.g. qwen/qwen3.8-flash).",
+      });
+    } else {
+      const params = found.supported_parameters ?? [];
+      const structured = params.includes("response_format") || params.includes("structured_outputs");
+      const tools = params.includes("tools");
+      const price = (p?: string) => (p ? `$${(Number(p) * 1_000_000).toFixed(2)}` : "?");
+      checks.push({
+        group: "Research",
+        name: "Model",
+        status: structured && tools ? "ok" : "fail",
+        detail:
+          `${model}: ${price(found.pricing?.prompt)} in / ${price(found.pricing?.completion)} out per million tokens. ` +
+          `Structured outputs ${structured ? "✓" : "✗"}, tools ${tools ? "✓" : "✗"}.`,
+        fix: structured && tools ? undefined : "Choose a model that supports both structured outputs and tools.",
+      });
+    }
+  } catch (err) {
+    checks.push({
+      group: "Research",
+      name: "Model",
+      status: "warn",
+      detail: `Could not load the model list: ${describe(err)}`,
+    });
+  }
+  return checks;
 }
 
 function checkSecret(): Check {
@@ -268,14 +334,14 @@ async function checkEmail(): Promise<Check> {
 }
 
 export async function runSetupChecks(requestUrl: string): Promise<Check[]> {
-  const [anthropic, google, database, email] = await Promise.all([
-    checkAnthropic(),
+  const [research, google, database, email] = await Promise.all([
+    checkOpenRouter(),
     checkGoogle(requestUrl),
     checkDatabase(),
     checkEmail(),
   ]);
   return [
-    anthropic,
+    ...research,
     checkSecret(),
     ...google,
     { group: "Sign-in", name: "Admins", status: "ok", detail: adminEmails().join(", ") },

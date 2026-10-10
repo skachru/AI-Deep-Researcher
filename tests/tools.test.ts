@@ -6,7 +6,7 @@ import { blendCredibility, heuristicCredibility } from "@/lib/tools/credibility"
 import { fetchWithRetry } from "@/lib/tools/http";
 import { capSources, chunkText, dedupeSources, normaliseUrl } from "@/lib/tools/rank";
 import type { RawSource } from "@/lib/tools/types";
-import { normaliseDate, parseWebSearchBlocks } from "@/lib/tools/webSearch";
+import { parseWebSearchMessage } from "@/lib/tools/webSearch";
 import { parseWikiExtract, parseWikiSearch, parseWikiSummary, searchWikipedia } from "@/lib/tools/wikipedia";
 
 const fixture = readFileSync(path.join(__dirname, "fixtures/arxiv.xml"), "utf8");
@@ -94,58 +94,59 @@ describe("Wikipedia parsers", () => {
   });
 });
 
-describe("web search block parser", () => {
-  const now = new Date("2026-10-10T00:00:00Z");
-  const blocks = [
-    { type: "server_tool_use", id: "x", name: "web_search", input: { query: "copilot study" } },
-    {
-      type: "web_search_tool_result",
-      tool_use_id: "x",
-      content: [
-        {
-          type: "web_search_result",
+describe("OpenRouter web search parser", () => {
+  const text = "Developers completed tasks 55% faster in a controlled study. Experienced developers were slower.";
+  const message = {
+    role: "assistant",
+    content: text,
+    annotations: [
+      {
+        type: "url_citation",
+        url_citation: {
           url: "https://github.blog/study",
           title: "Copilot study",
-          page_age: "March 3, 2025",
+          content: "In the experiment, developers using Copilot finished 55% faster.",
+          start_index: 0,
+          end_index: 58,
         },
-        { type: "web_search_result", url: "https://news.example.com/a", title: "News A", page_age: "2 days ago" },
-      ],
-    },
-    {
-      type: "text",
-      text: "Developers completed tasks 55% faster.",
-      citations: [
-        {
-          type: "web_search_result_location",
-          url: "https://github.blog/study",
-          title: "Copilot study",
-          cited_text: "55% faster",
-        },
-      ],
-    },
-    {
-      type: "web_search_tool_result",
-      content: { type: "web_search_tool_result_error", error_code: "max_uses_exceeded" },
-    },
-  ];
+      },
+      // Flattened shape some clients produce
+      { type: "url_citation", url: "https://metr.org/rct", title: "METR RCT", start_index: 61, end_index: 95 },
+      { type: "url_citation", url_citation: { url: "javascript:alert(1)", title: "bad" } },
+      { type: "something_else" },
+    ],
+  };
 
-  it("extracts results with cited passages and normalised dates", () => {
-    const out = parseWebSearchBlocks(blocks, "web", now);
-    expect(out).toHaveLength(2);
-    expect(out[0]).toMatchObject({ url: "https://github.blog/study", publishedDate: "2025-03-03", type: "web" });
-    expect(out[0].content).toContain("55% faster");
-    expect(out[0].content).toContain("Developers completed tasks 55% faster.");
-    expect(out[1].publishedDate).toBe("2026-10-08");
+  it("builds sources from url_citation annotations with excerpts and cited sentences", () => {
+    const out = parseWebSearchMessage(message, "web");
+    expect(out.map((s) => s.url)).toEqual(["https://github.blog/study", "https://metr.org/rct"]);
+    expect(out[0]).toMatchObject({ title: "Copilot study", type: "web", publishedDate: null });
+    expect(out[0].content).toContain("finished 55% faster");
+    expect(out[0].content).toContain("Developers completed tasks 55% faster in a controlled study.");
+    expect(out[1].content).toBe("Experienced developers were slower.");
   });
 
-  it("tags news mode and tolerates error blocks", () => {
-    expect(parseWebSearchBlocks(blocks, "news", now).every((s) => s.type === "news")).toBe(true);
-    expect(parseWebSearchBlocks([blocks[3]], "web", now)).toEqual([]);
+  it("tags news mode and tolerates empty or malformed messages", () => {
+    expect(parseWebSearchMessage(message, "news").every((s) => s.type === "news")).toBe(true);
+    expect(parseWebSearchMessage(undefined, "web")).toEqual([]);
+    expect(parseWebSearchMessage({ content: "no citations" }, "web")).toEqual([]);
   });
 
-  it("normalises unknown dates to null", () => {
-    expect(normaliseDate("sometime", now)).toBeNull();
-    expect(normaliseDate(null, now)).toBeNull();
+  it("calls OpenRouter with the web search server tool (mocked network)", async () => {
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        Response.json({ choices: [{ message }], usage: { prompt_tokens: 100, completion_tokens: 20 } }),
+      );
+    const { webSearch } = await import("@/lib/tools/webSearch");
+    const res = await webSearch({ questions: ["Does Copilot help?"], mode: "web", maxResults: 5 });
+    expect(res.sources).toHaveLength(2);
+    expect(res.usage).toEqual({ inputTokens: 100, outputTokens: 20 });
+    const [url, init] = spy.mock.calls[0];
+    expect(String(url)).toBe("https://openrouter.ai/api/v1/chat/completions");
+    const body = JSON.parse(String(init?.body)) as { tools: { type: string; parameters: { max_results: number } }[] };
+    expect(body.tools[0]).toMatchObject({ type: "openrouter:web_search", parameters: { max_results: 5 } });
   });
 });
 

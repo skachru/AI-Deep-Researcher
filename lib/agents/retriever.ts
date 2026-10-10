@@ -4,7 +4,7 @@ import { emit } from "@/lib/events/emit";
 import type { ToolName } from "@/lib/events/types";
 import type { ResearchStateType, ResearchStateUpdate } from "@/lib/graph/state";
 import { importantGaps } from "@/lib/graph/routing";
-import { budgetFor, createModel, usageFrom, type Effort } from "@/lib/llm";
+import { budgetFor, createModel, usageFrom } from "@/lib/llm";
 import type { Source, SubQuestion, Usage } from "@/lib/schemas/domain";
 import { addUsage, toSummary, ZERO_USAGE } from "@/lib/schemas/domain";
 import { PlanSchema, type Plan } from "@/lib/schemas/llm";
@@ -19,9 +19,10 @@ import { searchWikipedia } from "@/lib/tools/wikipedia";
 /** Sources held back on the first pass so a Standard-depth multi-hop follow-up has room. */
 const FOLLOW_UP_RESERVE = 3;
 
-async function planQuery(query: string, effort: Effort): Promise<{ plan: Plan; usage: Usage }> {
-  const model = createModel({ maxTokens: 4000, effort }).withStructuredOutput(PlanSchema, {
+async function planQuery(query: string): Promise<{ plan: Plan; usage: Usage }> {
+  const model = createModel({ maxTokens: 4000 }).withStructuredOutput(PlanSchema, {
     method: "jsonSchema",
+    strict: true,
     includeRaw: true,
   });
   const { parsed, raw } = await model.invoke([
@@ -71,7 +72,7 @@ export async function retrieverAgent(
   let wikiTopics: string[];
 
   if (!isFollowUp) {
-    const { plan, usage: planUsage } = await planQuery(state.query, budget.effort);
+    const { plan, usage: planUsage } = await planQuery(state.query);
     usage = addUsage(usage, planUsage);
     subQuestions = plan.subQuestions.slice(0, 5).map((sq, i) => ({ id: `Q${i + 1}`, ...sq, pass: 0 }));
     arxivQuery = plan.arxivQuery;
@@ -102,8 +103,7 @@ export async function retrieverAgent(
     {
       tool: "web_search",
       input: subQuestions.map((sq) => sq.searchQuery).join(" | "),
-      run: () =>
-        webSearch({ questions, mode: "web", maxUses: budget.webSearchUses, effort: "low", signal: config.signal }),
+      run: () => webSearch({ questions, mode: "web", maxResults: budget.webResults, signal: config.signal }),
     },
     {
       tool: "arxiv",
@@ -120,8 +120,7 @@ export async function retrieverAgent(
               webSearch({
                 questions: [state.query],
                 mode: "news",
-                maxUses: budget.newsSearchUses,
-                effort: "low",
+                maxResults: budget.newsResults,
                 signal: config.signal,
               }),
           },

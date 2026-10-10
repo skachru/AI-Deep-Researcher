@@ -15,7 +15,7 @@ const ICON: Record<CheckStatus, { icon: typeof CheckCircle2; className: string; 
 };
 
 /**
- * Validates the deployment's configuration live (Anthropic key, Google OAuth
+ * Validates the deployment's configuration live (OpenRouter key and model, Google OAuth
  * client + redirect URI, database, SMTP). Shows no secrets. Open to everyone
  * until an admin has signed in, then admins only.
  */
@@ -48,7 +48,7 @@ export default async function SetupPage() {
       <main className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-[22px] font-semibold tracking-tight">Setup check</h1>
         <p className="mt-1 text-[13px] text-muted">
-          Live test of this deployment&apos;s settings against Anthropic, Google, the database and your mail server.{" "}
+          Live test of this deployment&apos;s settings against OpenRouter, Google, the database and your mail server.{" "}
           {failing ? `${failing} item${failing > 1 ? "s" : ""} need fixing.` : "Everything required is working."}
         </p>
         <div className="mt-6 space-y-5">

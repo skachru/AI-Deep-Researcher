@@ -8,6 +8,8 @@ export interface FetchRetryOptions {
   baseDelayMs?: number;
   signal?: AbortSignal;
   headers?: Record<string, string>;
+  method?: "GET" | "POST";
+  body?: string;
 }
 
 export const USER_AGENT = "LumenDeepResearcher/0.1 (hackathon demo; https://github.com/skachru/AI-Deep-Researcher)";
@@ -21,7 +23,7 @@ class NonRetryableError extends Error {}
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function fetchWithRetry(url: string, options: FetchRetryOptions = {}): Promise<Response> {
-  const { timeoutMs = 10_000, retries = 2, baseDelayMs = 500, signal, headers } = options;
+  const { timeoutMs = 10_000, retries = 2, baseDelayMs = 500, signal, headers, method = "GET", body } = options;
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -29,12 +31,17 @@ export async function fetchWithRetry(url: string, options: FetchRetryOptions = {
     const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
     try {
       const res = await fetch(url, {
+        method,
+        body,
         signal: combined,
         headers: { "User-Agent": USER_AGENT, ...headers },
       });
       if (res.ok) return res;
       if (!isRetryableStatus(res.status) || attempt === retries) {
-        throw new NonRetryableError(`HTTP ${res.status} from ${new URL(url).host}`);
+        const detail = await res.text().catch(() => "");
+        throw new NonRetryableError(
+          `HTTP ${res.status} from ${new URL(url).host}${detail ? `: ${detail.slice(0, 300)}` : ""}`,
+        );
       }
       lastError = new Error(`HTTP ${res.status}`);
     } catch (err) {

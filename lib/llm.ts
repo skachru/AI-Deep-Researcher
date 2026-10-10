@@ -1,39 +1,48 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAICompletions } from "@langchain/openai";
 import { AIMessage, type BaseMessage } from "@langchain/core/messages";
 import { getServerEnv } from "@/lib/env";
 import type { Depth, Usage } from "@/lib/schemas/domain";
 import { ZERO_USAGE } from "@/lib/schemas/domain";
 
-export type Effort = "low" | "medium" | "high";
+export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 export interface ModelOptions {
-  /** Hard cap on output tokens for this agent (thinking counts toward it). */
+  /** Hard cap on output tokens for this agent. */
   maxTokens: number;
-  effort: Effort;
   timeoutMs?: number;
 }
 
+/** Headers OpenRouter uses to attribute traffic to the app (optional but recommended). */
+export function openRouterHeaders(): Record<string, string> {
+  return { "HTTP-Referer": process.env.APP_URL ?? "https://github.com/skachru/AI-Deep-Researcher", "X-Title": "Lumen" };
+}
+
 /**
- * One factory for every agent. Claude runs with adaptive thinking by default;
- * `effort` is the knob that trades depth for latency. The SDK retries
+ * One factory for every agent: an OpenAI-compatible chat model served through
+ * OpenRouter (model chosen with OPENROUTER_MODEL). `require_parameters` makes
+ * OpenRouter route only to providers that support every parameter we send —
+ * in particular `response_format` for structured outputs. The client retries
  * 408/429/5xx with exponential backoff (`maxRetries`).
  */
-export function createModel({ maxTokens, effort, timeoutMs = 120_000 }: ModelOptions): ChatAnthropic {
+export function createModel({ maxTokens, timeoutMs = 120_000 }: ModelOptions): ChatOpenAICompletions {
   const env = getServerEnv();
-  return new ChatAnthropic({
-    model: env.LUMEN_MODEL,
-    apiKey: env.ANTHROPIC_API_KEY,
+  return new ChatOpenAICompletions({
+    model: env.OPENROUTER_MODEL,
+    apiKey: env.OPENROUTER_API_KEY,
     maxTokens,
-    outputConfig: { effort },
-    clientOptions: { timeout: timeoutMs, maxRetries: 3 },
+    timeout: timeoutMs,
+    maxRetries: 3,
+    streamUsage: true,
+    configuration: { baseURL: OPENROUTER_BASE_URL, defaultHeaders: openRouterHeaders() },
+    modelKwargs: { provider: { require_parameters: true } },
   });
 }
 
 /** Per-depth effort/token budgets. Quick is tuned to finish well inside the function limit. */
 export function budgetFor(depth: Depth) {
   return depth === "quick"
-    ? { effort: "low" as const, maxSources: 10, evidencePerQuestion: 3, webSearchUses: 2, newsSearchUses: 1 }
-    : { effort: "medium" as const, maxSources: 15, evidencePerQuestion: 4, webSearchUses: 5, newsSearchUses: 3 };
+    ? { maxSources: 10, evidencePerQuestion: 3, webResults: 6, newsResults: 4 }
+    : { maxSources: 15, evidencePerQuestion: 4, webResults: 10, newsResults: 6 };
 }
 
 export function usageFrom(message: BaseMessage | undefined): Usage {
@@ -42,7 +51,7 @@ export function usageFrom(message: BaseMessage | undefined): Usage {
   return { inputTokens: meta.input_tokens ?? 0, outputTokens: meta.output_tokens ?? 0 };
 }
 
-/** Text content of an AIMessage, ignoring thinking/tool blocks. */
+/** Text content of an AIMessage, ignoring reasoning/tool blocks. */
 export function textOf(message: AIMessage): string {
   if (typeof message.content === "string") return message.content;
   return message.content
