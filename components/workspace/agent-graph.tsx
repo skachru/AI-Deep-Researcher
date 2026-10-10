@@ -30,7 +30,7 @@ const AgentNodeView = memo(function AgentNodeView({ data }: NodeProps<AgentNode>
   return (
     <div
       className={cn(
-        "flex w-[208px] items-center gap-2.5 rounded-lg border bg-surface px-3 py-2.5 shadow-card transition-colors duration-200",
+        "flex h-[58px] w-[208px] items-center gap-2.5 rounded-lg border bg-surface px-3 shadow-card transition-colors duration-200",
         data.status === "active" && "border-accent animate-pulse-ring",
         data.status === "done" && "border-border-strong",
         data.status === "idle" && "border-border",
@@ -86,27 +86,42 @@ function detailFor(agent: AgentId, view: ResearchViewState): string {
   return status === "active" ? "Writing…" : "Report ready";
 }
 
+/** Fixed node size: lets React Flow show nodes immediately instead of waiting to measure them. */
+const NODE_W = 208;
+const NODE_H = 58;
+
 export function AgentGraph({ view }: { view: ResearchViewState }) {
+  // Only what the nodes display. Rebuilding nodes on every streamed token (the quick
+  // summary emits dozens per second) kept React Flow re-measuring them, so they stayed hidden.
+  const nodeData = JSON.stringify(AGENTS.map((a) => [view.agents[a.id], detailFor(a.id, view)]));
+
   const nodes: Array<AgentNode | SpacerNodeType> = useMemo(
     () => [
-      ...AGENTS.map((a, i): AgentNode => ({
-        id: a.id,
-        type: "agent",
-        position: { x: 0, y: i * Y_GAP },
-        data: { agent: a.id, status: view.agents[a.id], detail: detailFor(a.id, view) },
-        draggable: false,
-        selectable: false,
-      })),
+      ...AGENTS.map((a, i): AgentNode => {
+        const [status, detail] = (JSON.parse(nodeData) as [AgentStatus, string][])[i];
+        return {
+          id: a.id,
+          type: "agent",
+          position: { x: 0, y: i * Y_GAP },
+          width: NODE_W,
+          height: NODE_H,
+          data: { agent: a.id, status, detail },
+          draggable: false,
+          selectable: false,
+        };
+      }),
       {
         id: "spacer",
         type: "spacer",
         position: { x: 262, y: Y_GAP / 2 },
+        width: 1,
+        height: 1,
         data: {},
         draggable: false,
         selectable: false,
       },
     ],
-    [view],
+    [nodeData],
   );
 
   const edges: Edge[] = useMemo(() => {
