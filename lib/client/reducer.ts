@@ -43,6 +43,11 @@ export interface ResearchViewState {
   insights: Insight[];
   activity: ActivityItem[];
   report: string | null;
+  /** Fast preliminary answer, streamed in seconds. */
+  quickSummary: string;
+  quickSummaryStatus: "waiting" | "streaming" | "done";
+  /** Id of the saved history entry, when history is enabled. */
+  searchId: string | null;
   usage: Usage;
   error: string | null;
 }
@@ -64,6 +69,9 @@ export const initialViewState: ResearchViewState = {
   insights: [],
   activity: [],
   report: null,
+  quickSummary: "",
+  quickSummaryStatus: "waiting",
+  searchId: null,
   usage: ZERO_USAGE,
   error: null,
 };
@@ -86,6 +94,7 @@ export function applyEvent(state: ResearchViewState, e: ResearchEvent): Research
     case "run_started":
       return {
         ...initialViewState,
+        searchId: state.searchId,
         status: "running",
         query: e.query,
         depth: e.depth,
@@ -202,6 +211,15 @@ export function applyEvent(state: ResearchViewState, e: ResearchEvent): Research
 
     case "usage":
       return { ...state, usage: addUsage(state.usage, e.usage) };
+
+    case "summary_delta":
+      return { ...state, quickSummary: state.quickSummary + e.text, quickSummaryStatus: "streaming" };
+
+    case "summary_ready":
+      return { ...state, quickSummary: e.summary || state.quickSummary, quickSummaryStatus: "done" };
+
+    case "saved":
+      return { ...state, searchId: e.searchId };
 
     case "error":
       return e.recoverable

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildMethodology, buildReferences } from "@/lib/agents/reporter";
 import { exportMarkdown, extractToc, prepareReportMarkdown } from "@/lib/client/report";
+import { renderReportHtml } from "@/lib/report/html";
+import { extractSummary, markdownToSafeHtml } from "@/lib/report/markdown";
+import { renderReportPdf, reportToPdfDefinition } from "@/lib/report/pdf";
 import type { Source } from "@/lib/schemas/domain";
 
 const source = (n: number, over: Partial<Source> = {}): Source => ({
@@ -55,5 +58,50 @@ describe("report markdown", () => {
     expect(m).toContain("1 arXiv papers");
     expect(m).toContain("multi-hop follow-up");
     expect(m).toContain("- arxiv failed");
+  });
+});
+
+const sample = `# Is X true?
+
+## Summary
+- Yes, mostly [1] {{Corroborated}}
+- With caveats [2, 3]
+
+## Key Findings
+Text with <script>alert(1)</script> and [a link](javascript:alert(1)) and [ok](https://ok.com).
+
+## References
+
+1. [Source](https://example.com/1)`;
+
+describe("report exports", () => {
+  it("extracts the summary section", () => {
+    expect(extractSummary(sample)).toBe("- Yes, mostly [1] {{Corroborated}}\n- With caveats [2, 3]");
+    expect(extractSummary("# T\n## Executive Summary\nOld style\n## Next")).toBe("Old style");
+    expect(extractSummary("no summary")).toBe("");
+  });
+
+  it("renders safe HTML: escapes raw HTML, drops non-http links, adds badges and citations", () => {
+    const html = markdownToSafeHtml(sample);
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).not.toContain("javascript:");
+    expect(html).toContain('<a href="https://ok.com"');
+    expect(html).toContain('<span class="claim claim-corroborated">Corroborated</span>');
+    expect(html).toContain('<sup class="cite">[2, 3]</sup>');
+  });
+
+  it("wraps HTML in a standalone document", () => {
+    const doc = renderReportHtml({ query: "Is X <true>?", markdown: sample, generatedAt: new Date(0) });
+    expect(doc.startsWith("<!doctype html>")).toBe(true);
+    expect(doc).toContain("<title>Is X &lt;true&gt;? — Lumen research report</title>");
+  });
+
+  it("builds a PDF definition and renders a real PDF", async () => {
+    const def = reportToPdfDefinition({ query: "Is X true?", markdown: sample, generatedAt: new Date(0) });
+    expect(JSON.stringify(def.content)).toContain("(Corroborated)");
+    expect(JSON.stringify(def.content)).not.toContain("javascript:");
+    const pdf = await renderReportPdf({ query: "Is X true?", markdown: sample, generatedAt: new Date(0) });
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
   });
 });

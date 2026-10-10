@@ -93,7 +93,7 @@ export async function analystAgent(
   rescored.forEach((source) => emit(config, { type: "source_found", source: toSummary(source) }));
 
   const gaps = parsed.gaps;
-  const willLoop = routeAfterAnalysis({ gaps, iteration: state.iteration }) === "retriever";
+  const willLoop = routeAfterAnalysis({ gaps, iteration: state.iteration, depth: state.depth }) === "retriever";
   emit(config, { type: "usage", usage });
   emit(config, {
     type: "agent_completed",

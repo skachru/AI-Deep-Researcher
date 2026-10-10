@@ -32,6 +32,12 @@ function describe(e: ResearchEvent): string {
       return `↻ Multi-hop pass ${e.iteration}: ${e.reason}`;
     case "report_ready":
       return `\n${e.report}\n`;
+    case "summary_delta":
+      return "";
+    case "summary_ready":
+      return `⚡ Quick summary:\n${e.summary}`;
+    case "saved":
+      return `  saved as ${e.searchId}`;
     case "usage":
       return `  tokens +${e.usage.inputTokens} in / +${e.usage.outputTokens} out`;
     case "error":
@@ -46,7 +52,10 @@ async function main() {
     args.filter((a) => !a.startsWith("--")).join(" ") ||
     "Do AI coding assistants actually improve developer productivity?";
   const started = Date.now();
-  for await (const event of runResearch({ query, depth })) console.log(describe(event));
+  for await (const event of runResearch({ query, depth })) {
+    const line = describe(event);
+    if (line) console.log(`[${((event.at - started) / 1000).toFixed(1)}s] ${line}`);
+  }
   console.log(`Done in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 }
 

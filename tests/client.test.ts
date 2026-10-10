@@ -101,3 +101,35 @@ describe("demo helpers", () => {
     expect(isRecording({ query: "q", events: [{ nope: 1 }] })).toBe(false);
   });
 });
+
+describe("run recorder (what history saves)", () => {
+  it("accumulates the quick summary, report, sources, usage and fatal errors", async () => {
+    const { emptyOutcome, recordEvent } = await import("@/lib/events/recorder");
+    const out = [
+      { type: "summary_delta", text: "Quick ", at: 1 },
+      { type: "summary_delta", text: "take", at: 2 },
+      { type: "usage", usage: { inputTokens: 3, outputTokens: 2 }, at: 3 },
+      { type: "error", message: "minor", recoverable: true, at: 4 },
+      { type: "report_ready", report: "# R", sources: [], at: 5 },
+    ].reduce((acc, e) => recordEvent(acc, e as ResearchEvent), emptyOutcome());
+    expect(out).toEqual({
+      quickSummary: "Quick take",
+      report: "# R",
+      sources: [],
+      usage: { inputTokens: 3, outputTokens: 2 },
+      error: null,
+    });
+    expect(recordEvent(out, { type: "error", message: "boom", recoverable: false, at: 6 }).error).toBe("boom");
+  });
+
+  it("shows the streamed quick summary and the saved search id in the UI state", () => {
+    const s = [
+      { type: "saved", searchId: "abc", at: 0 },
+      { type: "run_started", query: "q?", depth: "quick", at: 1 },
+      { type: "summary_delta", text: "Hi", at: 2 },
+    ].reduce((acc, e) => applyEvent(acc, e as ResearchEvent), initialViewState);
+    expect(s.searchId).toBe("abc");
+    expect(s.quickSummary).toBe("Hi");
+    expect(s.quickSummaryStatus).toBe("streaming");
+  });
+});

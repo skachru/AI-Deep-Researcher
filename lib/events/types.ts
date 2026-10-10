@@ -35,7 +35,10 @@ export type ResearchEventBody =
   | { type: "contradiction_found"; contradiction: Contradiction }
   | { type: "insight_added"; insight: Insight }
   | { type: "iteration_started"; iteration: number; reason: string; subQuestions: SubQuestion[] }
+  | { type: "summary_delta"; text: string }
+  | { type: "summary_ready"; summary: string }
   | { type: "report_ready"; report: string; sources: SourceSummary[] }
+  | { type: "saved"; searchId: string }
   | { type: "usage"; usage: Usage }
   | { type: "error"; message: string; recoverable: boolean };
 

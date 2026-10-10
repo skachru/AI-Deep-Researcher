@@ -32,7 +32,7 @@ export function createModel({ maxTokens, effort, timeoutMs = 120_000 }: ModelOpt
 /** Per-depth effort/token budgets. Quick is tuned to finish well inside the function limit. */
 export function budgetFor(depth: Depth) {
   return depth === "quick"
-    ? { effort: "low" as const, maxSources: 12, evidencePerQuestion: 3, webSearchUses: 3, newsSearchUses: 2 }
+    ? { effort: "low" as const, maxSources: 10, evidencePerQuestion: 3, webSearchUses: 2, newsSearchUses: 1 }
     : { effort: "medium" as const, maxSources: 15, evidencePerQuestion: 4, webSearchUses: 5, newsSearchUses: 3 };
 }
 

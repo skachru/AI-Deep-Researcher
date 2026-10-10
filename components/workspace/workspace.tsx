@@ -9,7 +9,9 @@ import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { EmailReport } from "@/components/report/report-actions";
 import { AgentGraph } from "@/components/workspace/agent-graph";
+import { QuickSummary } from "@/components/workspace/quick-summary";
 import { SideTabs } from "@/components/workspace/side-tabs";
 import { Timeline } from "@/components/workspace/timeline";
 import { useResearch } from "@/lib/client/useResearch";
@@ -132,7 +134,7 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
           >
-            <ReportView report={state.report} sources={state.sources} query={query} />
+            <ReportView report={state.report} sources={state.sources} query={query} searchId={state.searchId} />
           </motion.div>
         ) : (
           <motion.main
@@ -170,22 +172,22 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
               )}
             </Card>
 
-            <Card className="flex min-h-[420px] flex-col overflow-hidden">
-              <CardHeader>
-                Activity
-                <span className="text-[12px] font-normal text-subtle tabular-nums">{state.activity.length} events</span>
-              </CardHeader>
-              <div className="min-h-0 flex-1">
-                <Timeline items={state.activity} running={state.status === "running"} />
-              </div>
-              {state.report && (
-                <div className="border-t border-border p-3">
-                  <Button variant="primary" className="w-full" onClick={() => setView("report")}>
-                    <FileText /> Open the report
-                  </Button>
+            <div className="flex min-h-0 flex-col gap-4">
+              <QuickSummary query={query} view={state} onOpenReport={() => setView("report")}>
+                {state.report && <EmailReport report={{ searchId: state.searchId, query, markdown: state.report }} />}
+              </QuickSummary>
+              <Card className="flex min-h-[320px] flex-1 flex-col overflow-hidden">
+                <CardHeader>
+                  Activity
+                  <span className="text-[12px] font-normal text-subtle tabular-nums">
+                    {state.activity.length} events
+                  </span>
+                </CardHeader>
+                <div className="min-h-0 flex-1">
+                  <Timeline items={state.activity} running={state.status === "running"} />
                 </div>
-              )}
-            </Card>
+              </Card>
+            </div>
 
             <Card className="flex min-h-[420px] flex-col overflow-hidden">
               <SideTabs view={state} />

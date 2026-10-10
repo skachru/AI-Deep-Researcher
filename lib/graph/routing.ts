@@ -1,4 +1,4 @@
-import type { Gap } from "@/lib/schemas/domain";
+import type { Depth, Gap } from "@/lib/schemas/domain";
 
 /** Maximum retrieval passes in total (first pass + one multi-hop follow-up). */
 export const MAX_RETRIEVAL_PASSES = 2;
@@ -13,10 +13,11 @@ export function importantGaps(gaps: Gap[]): Gap[] {
 
 /**
  * Conditional edge after Critical Analysis (pure, unit-tested).
- * Loop back to the Retriever only if there are important gaps AND we have
- * not yet used the follow-up pass (iteration is 0-based).
+ * Loop back to the Retriever only in Standard depth, if there are important
+ * gaps AND we have not yet used the follow-up pass (iteration is 0-based).
+ * Quick depth skips the loop to keep latency low.
  */
-export function routeAfterAnalysis(state: { gaps: Gap[]; iteration: number }): AnalysisRoute {
-  const canLoop = state.iteration < MAX_RETRIEVAL_PASSES - 1;
+export function routeAfterAnalysis(state: { gaps: Gap[]; iteration: number; depth: Depth }): AnalysisRoute {
+  const canLoop = state.depth === "standard" && state.iteration < MAX_RETRIEVAL_PASSES - 1;
   return canLoop && importantGaps(state.gaps).length > 0 ? ROUTE_RETRY : ROUTE_CONTINUE;
 }

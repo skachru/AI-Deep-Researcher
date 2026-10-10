@@ -1,23 +1,20 @@
 "use client";
 
-import { Check, Copy, Download } from "lucide-react";
 import { isValidElement, useEffect, useMemo, useState, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { EmailReport, ReportActions } from "@/components/report/report-actions";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { CredibilityBar, domainOf, SourceTypeBadge } from "@/components/workspace/source-pieces";
 import {
   CITE_PREFIX,
   CLAIM_PREFIX,
-  exportMarkdown,
   extractToc,
   headingId,
   isClaimStatus,
   prepareReportMarkdown,
 } from "@/lib/client/report";
-import { slugify } from "@/lib/demo/examples";
 import type { ClaimStatus, SourceSummary } from "@/lib/schemas/domain";
 import { cn } from "@/lib/utils";
 
@@ -91,8 +88,18 @@ function useActiveHeading(ids: string[]) {
   return active;
 }
 
-export function ReportView({ report, sources, query }: { report: string; sources: SourceSummary[]; query: string }) {
-  const [copied, setCopied] = useState(false);
+export function ReportView({
+  report,
+  sources,
+  query,
+  searchId,
+}: {
+  report: string;
+  sources: SourceSummary[];
+  query: string;
+  searchId: string | null;
+}) {
+  const ref = useMemo(() => ({ searchId, query, markdown: report }), [searchId, query, report]);
   const markdown = useMemo(() => prepareReportMarkdown(report), [report]);
   const toc = useMemo(() => extractToc(report), [report]);
   const ids = useMemo(() => toc.map((t) => t.id), [toc]);
@@ -132,22 +139,6 @@ export function ReportView({ report, sources, query }: { report: string; sources
     [byNumber],
   );
 
-  const copy = async () => {
-    await navigator.clipboard.writeText(exportMarkdown(report));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const download = () => {
-    const blob = new Blob([exportMarkdown(report)], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slugify(query) || "lumen-report"}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="mx-auto grid max-w-[1120px] grid-cols-1 gap-8 px-4 py-8 lg:grid-cols-[220px_minmax(0,1fr)]">
       <aside className="hidden lg:block">
@@ -175,19 +166,15 @@ export function ReportView({ report, sources, query }: { report: string; sources
       </aside>
 
       <article className="min-w-0 rounded-lg border border-border bg-surface px-6 py-8 shadow-card sm:px-10">
-        <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
-          <Button size="sm" onClick={copy}>
-            {copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy Markdown"}
-          </Button>
-          <Button size="sm" onClick={download}>
-            <Download /> Download .md
-          </Button>
+        <div className="mb-6">
+          <ReportActions report={ref} />
         </div>
         <div className="prose-report">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
             {markdown}
           </ReactMarkdown>
         </div>
+        <EmailReport report={ref} className="mt-10" />
       </article>
     </div>
   );

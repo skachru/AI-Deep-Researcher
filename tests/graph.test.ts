@@ -1,4 +1,4 @@
-import { AIMessage } from "@langchain/core/messages";
+import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResearchEvent } from "@/lib/events/types";
 import { AnalysisSchema, InsightsSchema, PlanSchema } from "@/lib/schemas/llm";
@@ -86,7 +86,12 @@ vi.mock("@/lib/llm", async (importActual) => {
           throw new Error("unexpected schema");
         },
       }),
-      invoke: async () => usageMsg("## Executive Summary\nAssistants help [1]."),
+      invoke: async () => usageMsg("## Summary\n- Assistants help [1]."),
+      stream: async () =>
+        (async function* () {
+          yield new AIMessageChunk({ content: "- Quick " });
+          yield new AIMessageChunk({ content: "answer" });
+        })(),
     }),
   };
 });
@@ -121,10 +126,29 @@ describe("research graph", () => {
     analysisCalls = 0;
   });
 
-  it("runs all four agents, loops once for an important gap and produces a cited report", async () => {
+  it("streams a quick summary first, then runs the agents without looping in Quick depth", async () => {
     const { runResearch } = await import("@/lib/graph/run");
     const events: ResearchEvent[] = [];
     for await (const e of runResearch({ query: "Do AI coding assistants help?", depth: "quick" })) events.push(e);
+
+    const order = events
+      .filter((e) => e.type === "agent_started")
+      .map((e) => (e.type === "agent_started" ? e.agent : ""));
+    expect(order).toEqual(["retriever", "analyst", "insight", "reporter"]);
+
+    const summaryAt = events.findIndex((e) => e.type === "summary_ready");
+    const reportAt = events.findIndex((e) => e.type === "report_ready");
+    expect(summaryAt).toBeGreaterThan(-1);
+    expect(summaryAt).toBeLessThan(reportAt);
+    const ready = events[summaryAt];
+    expect(ready.type === "summary_ready" && ready.summary).toBe("- Quick answer");
+    expect(events.filter((e) => e.type === "summary_delta")).toHaveLength(2);
+  });
+
+  it("runs all four agents, loops once for an important gap and produces a cited report", async () => {
+    const { runResearch } = await import("@/lib/graph/run");
+    const events: ResearchEvent[] = [];
+    for await (const e of runResearch({ query: "Do AI coding assistants help?", depth: "standard" })) events.push(e);
 
     const order = events
       .filter((e) => e.type === "agent_started")
@@ -144,7 +168,7 @@ describe("research graph", () => {
     const report = events.find((e) => e.type === "report_ready");
     expect(report?.type).toBe("report_ready");
     if (report?.type === "report_ready") {
-      expect(report.report).toContain("## Executive Summary");
+      expect(report.report).toContain("## Summary");
       expect(report.report).toContain("## Methodology");
       expect(report.report).toContain("## References");
       expect(report.report).toContain("wikipedia failed");

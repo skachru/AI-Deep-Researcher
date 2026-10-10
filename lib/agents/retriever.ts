@@ -16,7 +16,7 @@ import type { RawSource } from "@/lib/tools/types";
 import { webSearch } from "@/lib/tools/webSearch";
 import { searchWikipedia } from "@/lib/tools/wikipedia";
 
-/** Sources held back on the first pass so a multi-hop follow-up has room. */
+/** Sources held back on the first pass so a Standard-depth multi-hop follow-up has room. */
 const FOLLOW_UP_RESERVE = 3;
 
 async function planQuery(query: string, effort: Effort): Promise<{ plan: Plan; usage: Usage }> {
@@ -152,7 +152,9 @@ export async function retrieverAgent(
   for (const r of results) if (r.usage) usage = addUsage(usage, r.usage);
 
   // 3. Dedupe against what we already have, cap, and assign stable ids.
-  const room = isFollowUp ? budget.maxSources - state.sources.length : budget.maxSources - FOLLOW_UP_RESERVE;
+  const room = isFollowUp
+    ? budget.maxSources - state.sources.length
+    : budget.maxSources - (state.depth === "standard" ? FOLLOW_UP_RESERVE : 0);
   const fresh = capSources(
     dedupeSources(
       results.flatMap((r) => r.sources),

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountNav } from "@/components/account-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ export function SiteHeader({ children }: { children?: React.ReactNode }) {
         >
           GitHub
         </a>
+        <AccountNav />
         <ThemeToggle />
       </div>
     </header>
