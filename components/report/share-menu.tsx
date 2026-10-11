@@ -2,7 +2,7 @@
 
 import { Check, Download, FileText, Globe, Loader2, Mail, MessageCircle, Send, Share2 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchExport, type ReportRef, saveBlob } from "@/components/report/report-actions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -52,7 +52,9 @@ export function ShareMenu({ report }: { report: ReportRef }) {
   const [files, setFiles] = useState<Files>({ status: "idle" });
   const [text, setText] = useState<string | null>(null);
   const [downloaded, setDownloaded] = useState(false);
-  const [shared, setShared] = useState(false);
+  const [native, setNative] = useState<{ state: "idle" | "sharing" | "shared" | "error"; note?: string }>({
+    state: "idle",
+  });
   const [to, setTo] = useState("");
   const [send, setSend] = useState<{ state: "idle" | "sending" | "sent" | "error"; note?: string }>({ state: "idle" });
   const name = slugify(report.query) || "lumen-report";
@@ -61,8 +63,25 @@ export function ShareMenu({ report }: { report: ReportRef }) {
   const subject = shareSubject(report.query);
   const emailOn = Boolean(me?.features.email);
 
+  // Files are made once per report; a changed report (e.g. a new run) needs fresh files.
+  const filesFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (filesFor.current !== null && filesFor.current !== report.markdown) setFiles({ status: "idle" });
+  }, [report.markdown]);
+
+  // Each time the menu opens, every option is available again.
+  const onOpenChange = (open: boolean) => {
+    if (!open) return;
+    setDownloaded(false);
+    setPendingDownload(false);
+    setNative({ state: "idle" });
+    setSend((s) => (s.state === "sending" ? s : { state: "idle" }));
+    void prepare();
+  };
+
   const prepare = async () => {
-    if (files.status === "loading" || files.status === "ready") return;
+    if (files.status === "loading" || (files.status === "ready" && filesFor.current === report.markdown)) return;
+    filesFor.current = report.markdown;
     setFiles({ status: "loading" });
     try {
       const [pdf, html] = await Promise.all([fetchExport(report, "pdf"), fetchExport(report, "html")]);
@@ -87,17 +106,38 @@ export function ShareMenu({ report }: { report: ReportRef }) {
   })();
 
   const shareNative = async () => {
-    if (!shareable) return;
+    if (!shareable || native.state === "sharing") return;
+    setNative({ state: "sharing" });
+    // Some platforms never settle the promise if the share sheet is dismissed oddly: don't stay stuck.
+    const unstick = setTimeout(() => setNative((n) => (n.state === "sharing" ? { state: "idle" } : n)), 15_000);
     try {
       await navigator.share({ title: subject, text: message, files: shareable });
-      setShared(true);
-    } catch {
-      // cancelled or refused by the target app: nothing to do
+      clearTimeout(unstick);
+      setNative({ state: "shared" });
+      setTimeout(() => setNative((n) => (n.state === "shared" ? { state: "idle" } : n)), 2500);
+    } catch (err) {
+      clearTimeout(unstick);
+      const name = err instanceof DOMException ? err.name : "";
+      // AbortError = the user closed the share sheet: ready to share again.
+      setNative(
+        name === "AbortError" || name === ""
+          ? { state: "idle" }
+          : { state: "error", note: "Sharing didn't go through. Please try again, or use one of the options below." },
+      );
     }
   };
 
+  // An app opened before the files were ready gets them as soon as they are.
+  const [pendingDownload, setPendingDownload] = useState(false);
+  useEffect(() => {
+    if (pendingDownload && ready) {
+      setPendingDownload(false);
+      downloadFiles();
+    }
+  });
+
   const downloadFiles = () => {
-    if (!ready || downloaded) return;
+    if (!ready || downloaded) return; // once per opening of the menu
     ready.forEach((f, i) => setTimeout(() => saveBlob(f, f.name), i * 400));
     setDownloaded(true);
   };
@@ -140,6 +180,7 @@ export function ShareMenu({ report }: { report: ReportRef }) {
       });
       if (!res.ok) throw new Error(await errorFrom(res));
       setSend({ state: "sent", note: `Sent to ${recipients.join(", ")} with the PDF and HTML attached.` });
+      setTo("");
     } catch (err) {
       setSend({ state: "error", note: err instanceof Error ? err.message : "Could not send" });
     }
@@ -148,7 +189,7 @@ export function ShareMenu({ report }: { report: ReportRef }) {
   const signInHref = `/login?next=${encodeURIComponent(report.searchId ? `/history/${report.searchId}` : "/history")}`;
 
   return (
-    <Popover onOpenChange={(open) => open && void prepare()}>
+    <Popover onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button size="sm" aria-label="Share report">
           <Share2 />
@@ -182,7 +223,14 @@ export function ShareMenu({ report }: { report: ReportRef }) {
             </span>
           ))}
         </div>
-        {files.status === "error" && <p className="mt-2 text-[12px] text-danger">{files.error}</p>}
+        {files.status === "error" && (
+          <p className="mt-2 text-[12px] text-danger">
+            {files.error}{" "}
+            <button type="button" className="font-medium underline" onClick={() => void prepare()}>
+              Try again
+            </button>
+          </p>
+        )}
 
         {emailOn && (
           <div className="mt-4 rounded-lg border border-border bg-surface-muted/60 p-3">
@@ -204,14 +252,8 @@ export function ShareMenu({ report }: { report: ReportRef }) {
                   className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2.5 text-[12.5px] outline-none focus:border-accent/60"
                 />
                 <Button type="submit" variant="primary" disabled={!to.trim() || send.state === "sending"}>
-                  {send.state === "sending" ? (
-                    <Loader2 className="animate-spin" />
-                  ) : send.state === "sent" ? (
-                    <Check />
-                  ) : (
-                    <Send />
-                  )}
-                  {send.state === "sent" ? "Sent" : "Send"}
+                  {send.state === "sending" ? <Loader2 className="animate-spin" /> : <Send />}
+                  Send
                 </Button>
               </form>
             ) : (
@@ -231,10 +273,26 @@ export function ShareMenu({ report }: { report: ReportRef }) {
         )}
 
         {shareable && (
-          <Button variant="primary" className="mt-4 w-full" onClick={() => void shareNative()}>
-            {shared ? <Check /> : <Share2 />}
-            {shared ? "Shared" : `Share via apps with ${shareable.length === 2 ? "PDF + HTML" : "PDF"} attached`}
-          </Button>
+          <>
+            <Button
+              variant="primary"
+              className="mt-4 w-full"
+              onClick={() => void shareNative()}
+              disabled={native.state === "sharing"}
+            >
+              {native.state === "sharing" ? (
+                <Loader2 className="animate-spin" />
+              ) : native.state === "shared" ? (
+                <Check />
+              ) : (
+                <Share2 />
+              )}
+              {native.state === "shared"
+                ? "Shared. Share again?"
+                : `Share via apps with ${shareable.length === 2 ? "PDF + HTML" : "PDF"} attached`}
+            </Button>
+            {native.state === "error" && <p className="mt-2 text-[12px] text-danger">{native.note}</p>}
+          </>
         )}
 
         <div className="mt-4 text-[11.5px] font-medium text-subtle">Open in</div>
@@ -245,15 +303,8 @@ export function ShareMenu({ report }: { report: ReportRef }) {
               href={shareHref(t.id, subject, message, appUrl)}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => {
-                if (!ready) e.preventDefault();
-                else downloadFiles();
-              }}
-              aria-disabled={!ready}
-              className={cn(
-                "group flex flex-col items-center gap-1.5 text-center text-[11px] leading-tight text-muted hover:text-foreground",
-                !ready && "pointer-events-none opacity-50",
-              )}
+              onClick={() => (ready ? downloadFiles() : setPendingDownload(true))}
+              className="group flex flex-col items-center gap-1.5 text-center text-[11px] leading-tight text-muted hover:text-foreground"
             >
               <span
                 className={cn(
@@ -285,9 +336,11 @@ export function ShareMenu({ report }: { report: ReportRef }) {
           )}
         >
           <Download className="mt-px size-3.5 shrink-0" />
-          {downloaded
-            ? "PDF and HTML downloaded. Attach them to your message in the app that just opened."
-            : "WhatsApp, Telegram, Gmail and Outlook web only accept text from a website, so we download the files for you to attach. Email app saves a draft with the files already attached (Outlook, Apple Mail, Thunderbird)."}
+          {pendingDownload
+            ? "Preparing the PDF and HTML. They'll download in a moment for you to attach."
+            : downloaded
+              ? "PDF and HTML downloaded. Attach them to your message in the app that just opened."
+              : "WhatsApp, Telegram, Gmail and Outlook web only accept text from a website, so we download the files for you to attach. Email app saves a draft with the files already attached (Outlook, Apple Mail, Thunderbird)."}
         </p>
         {!emailOn && me?.isAdmin && (
           <p className="mt-2 text-[11.5px] text-subtle">
