@@ -96,10 +96,12 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
 - **Reliability panel:** every report (UI, HTML, PDF) opens with its evidence strength (Strong / Moderate / Limited), the
   share of corroborated vs disputed claims and the source mix. Sources show thumbnails (Wikipedia images, page preview
   images fetched through an SSRF-guarded `/api/og`, or the site icon).
-- **Downloads:** PDF, HTML and Markdown from the report view (`POST /api/export`; the PDF is rendered server-side with
-  pdfmake, and the HTML is sanitised because report text derives from web content).
-- **Email:** after each report the user is asked for their email; `POST /api/email` sends the report as HTML with the PDF
-  attached (rate-limited per user, per IP and overall).
+- **Downloads and print:** a single Download menu offers PDF, interactive HTML and Markdown (`POST /api/export`; the PDF is
+  rendered server-side with pdfmake). The HTML (`lib/report/interactive.ts`) is a self-contained page with key takeaways,
+  an evidence ring, claim filters, citation previews that jump to the source, source filters, dark mode and print; all
+  report text is sanitised because it derives from web content. **Print** prints that designed report, not the app.
+- **Email:** after each report the user is asked for their email; `POST /api/email` sends the report as HTML with the PDF and
+  the interactive HTML attached (rate-limited per user, per IP and overall).
 - **Admin:** `/admin` (only for `ADMIN_EMAILS`) shows searches, success rate, users, average run time, tokens, emails sent,
   searches per day, top questions and recent searches.
 

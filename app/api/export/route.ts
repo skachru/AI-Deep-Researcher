@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getViewer } from "@/lib/auth/session";
-import { renderReportHtml } from "@/lib/report/html";
+import { renderInteractiveReportHtml } from "@/lib/report/interactive";
 import { fileSlug, ReportRefSchema, resolveReport } from "@/lib/report/payload";
 import { renderReportPdf } from "@/lib/report/pdf";
 import { clientIp, consumeLimit } from "@/lib/rateLimit";
@@ -29,7 +29,8 @@ export async function POST(request: Request): Promise<Response> {
   const name = fileSlug(resolved.query);
 
   if (parsed.data.format === "html") {
-    return new Response(renderReportHtml(doc), {
+    const appUrl = process.env.APP_URL ?? new URL(request.url).origin;
+    return new Response(renderInteractiveReportHtml({ ...doc, appUrl }), {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Content-Disposition": `attachment; filename="${name}.html"`,

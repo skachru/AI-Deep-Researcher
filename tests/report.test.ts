@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildMethodology, buildReferences } from "@/lib/agents/reporter";
 import { exportMarkdown, extractToc, prepareReportMarkdown } from "@/lib/client/report";
 import { renderReportHtml } from "@/lib/report/html";
+import { linkCitations, renderInteractiveReportHtml, withoutSummary } from "@/lib/report/interactive";
 import { extractSummary, markdownToSafeHtml } from "@/lib/report/markdown";
 import { renderReportPdf, reportToPdfDefinition } from "@/lib/report/pdf";
 import type { Source } from "@/lib/schemas/domain";
@@ -103,5 +104,54 @@ describe("report exports", () => {
     expect(JSON.stringify(def.content)).not.toContain("javascript:");
     const pdf = await renderReportPdf({ query: "Is X true?", markdown: sample, generatedAt: new Date(0) });
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+});
+
+describe("interactive HTML report", () => {
+  const sources = [1, 2].map((n) => ({
+    id: `S${n}`,
+    title: `Title ${n} <b>`,
+    url: `https://example.com/${n}`,
+    type: "web" as const,
+    credibility: 70,
+    publishedDate: null,
+    image: null,
+  }));
+
+  it("links known citations to source cards and leaves unknown ones as text", () => {
+    const out = linkCitations('a <sup class="cite">[1, 3]</sup>', new Set([1]));
+    expect(out).toBe(
+      'a <span class="cites"><a class="cite" href="#src-1" data-n="1">1</a><span class="cite">3</span></span>',
+    );
+  });
+
+  it("moves the summary into key takeaways and keeps report text inert", () => {
+    expect(withoutSummary(sample)).not.toContain("Yes, mostly");
+    const doc = renderInteractiveReportHtml({
+      query: "Is X <true>?",
+      markdown: sample,
+      sources,
+      generatedAt: new Date(0),
+      appUrl: "https://lumen.example",
+    });
+    expect(doc.startsWith("<!doctype html>")).toBe(true);
+    expect(doc).toContain('id="key-takeaways"');
+    expect(doc.match(/Yes, mostly/g)).toHaveLength(1);
+    expect(doc).toContain('id="src-2"');
+    expect(doc).toContain("Title 1 &lt;b&gt;");
+    expect(doc).toContain('href="https://lumen.example"');
+    expect(doc).not.toContain("<script>alert");
+    expect(doc).not.toContain("javascript:alert");
+    expect(doc.match(/<script>/g)).toHaveLength(1);
+  });
+
+  it("omits the call to action without a safe app URL", () => {
+    const doc = renderInteractiveReportHtml({
+      query: "q",
+      markdown: sample,
+      generatedAt: new Date(0),
+      appUrl: "javascript:x",
+    });
+    expect(doc).not.toContain('class="cta"');
   });
 });

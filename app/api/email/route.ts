@@ -4,6 +4,7 @@ import { recordEmailDelivery } from "@/lib/db/searches";
 import { clientIp, consumeAll, LIMITS } from "@/lib/rateLimit";
 import { EMAIL_PATTERN, isEmailConfigured, sendMail } from "@/lib/email";
 import { renderReportHtml } from "@/lib/report/html";
+import { renderInteractiveReportHtml } from "@/lib/report/interactive";
 import { extractSummary, plainClaims } from "@/lib/report/markdown";
 import { fileSlug, ReportRefSchema, resolveReport } from "@/lib/report/payload";
 import { renderReportPdf } from "@/lib/report/pdf";
@@ -55,8 +56,15 @@ export async function POST(request: Request): Promise<Response> {
       to,
       subject: `Your Lumen research report: ${resolved.query.slice(0, 80)}`,
       html: renderReportHtml(doc),
-      text: `${resolved.query}\n\nSummary\n${plainClaims(extractSummary(resolved.markdown))}\n\nThe full report is attached as a PDF.`,
-      attachments: [{ filename: `${fileSlug(resolved.query)}.pdf`, content: pdf, contentType: "application/pdf" }],
+      text: `${resolved.query}\n\nSummary\n${plainClaims(extractSummary(resolved.markdown))}\n\nThe full report is attached as a PDF, plus an interactive HTML version to open in your browser.`,
+      attachments: [
+        { filename: `${fileSlug(resolved.query)}.pdf`, content: pdf, contentType: "application/pdf" },
+        {
+          filename: `${fileSlug(resolved.query)}-interactive.html`,
+          content: renderInteractiveReportHtml({ ...doc, appUrl: process.env.APP_URL ?? new URL(request.url).origin }),
+          contentType: "text/html",
+        },
+      ],
     });
   } catch (err) {
     console.error("email: send failed", err);
