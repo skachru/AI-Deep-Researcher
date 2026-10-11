@@ -6,16 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EXAMPLE_QUERIES, recordingPath } from "@/lib/demo/examples";
 import { type Depth, REPORT_LENGTHS, type ReportLength } from "@/lib/schemas/domain";
+import { researchHref } from "@/lib/research-url";
 import { cn } from "@/lib/utils";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-
-function researchHref(query: string, depth: Depth, length: ReportLength, replay = false) {
-  const params = new URLSearchParams({ q: query, depth });
-  if (length !== "full") params.set("length", length);
-  if (replay) params.set("replay", "1");
-  return `/research?${params.toString()}`;
-}
 
 function Segmented<T extends string>({
   label,
@@ -77,7 +71,7 @@ export function QueryForm() {
   const canSubmit = trimmed.length >= 8;
 
   const submit = () => {
-    if (canSubmit) router.push(researchHref(trimmed, depth, length));
+    if (canSubmit) router.push(researchHref({ query: trimmed, depth, length }));
   };
 
   return (
@@ -131,7 +125,7 @@ export function QueryForm() {
           return (
             <button
               key={q}
-              onClick={() => router.push(researchHref(q, depth, length, DEMO_MODE && hasRecording))}
+              onClick={() => router.push(researchHref({ query: q, depth, length, replay: DEMO_MODE && hasRecording }))}
               className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-muted shadow-card transition-colors duration-150 hover:border-border-strong hover:text-foreground"
             >
               {DEMO_MODE && hasRecording && <PlayCircle className="size-3.5 text-accent" aria-label="Recorded run" />}

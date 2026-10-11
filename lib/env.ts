@@ -26,6 +26,3 @@ export function getServerEnv(): ServerEnv {
   cached = parsed.data;
   return cached;
 }
-
-/** Public flag, inlined at build time by Next.js. */
-export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";

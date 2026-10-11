@@ -8,6 +8,7 @@ import { isDbConfigured } from "@/lib/db";
 import { listSearches } from "@/lib/db/searches";
 import { isEmailConfigured } from "@/lib/email";
 import { formatDuration } from "@/lib/utils";
+import { researchHref } from "@/lib/research-url";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "History — Lumen" };
@@ -55,7 +56,7 @@ export default async function HistoryPage() {
               const href =
                 s.status === "done"
                   ? `/history/${s.id}`
-                  : `/research?${new URLSearchParams({ q: s.query, depth: s.depth }).toString()}`;
+                  : researchHref({ query: s.query, depth: s.depth, length: s.length });
               return (
                 <li key={s.id}>
                   <Link href={href} className="block px-4 py-3.5 transition-colors duration-150 hover:bg-surface-muted">

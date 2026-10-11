@@ -170,3 +170,14 @@ describe("reducer robustness", () => {
     expect(s.query).toBe("q?");
   });
 });
+
+describe("event validation", () => {
+  it("rejects recognised events with malformed payloads", async () => {
+    const { isResearchEvent } = await import("@/lib/events/emit");
+    expect(isResearchEvent({ type: "report_ready", at: 1, report: "x" })).toBe(false);
+    expect(isResearchEvent({ type: "source_found", at: 1, source: { id: "S1" } })).toBe(false);
+    expect(isResearchEvent({ type: "totally_unknown", at: 1 })).toBe(false);
+    expect(isResearchEvent({ type: "report_ready", at: 1, report: "x", sources: [] })).toBe(true);
+    expect(events.every(isResearchEvent)).toBe(true);
+  });
+});

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { SourceSummary, Usage } from "@/lib/schemas/domain";
+import { parseReportLength, type ReportLength, type SourceSummary, type Usage } from "@/lib/schemas/domain";
 
 export interface Viewer {
   anonId: string;
@@ -13,6 +13,7 @@ export interface SearchListItem {
   id: string;
   query: string;
   depth: string;
+  length: ReportLength;
   status: "running" | "done" | "error";
   sourceCount: number;
   createdAt: string;
@@ -36,6 +37,7 @@ interface SearchRow {
   user_email: string | null;
   query: string;
   depth: string;
+  report_length?: string | null;
   status: SearchListItem["status"];
   quick_summary: string | null;
   report: string | null;
@@ -57,6 +59,7 @@ function toRecord(r: SearchRow): SearchRecord {
     userEmail: r.user_email,
     query: r.query,
     depth: r.depth,
+    length: parseReportLength(r.report_length),
     status: r.status,
     quickSummary: r.quick_summary,
     report: r.report,
@@ -70,11 +73,17 @@ function toRecord(r: SearchRow): SearchRecord {
   };
 }
 
-export async function createSearch(viewer: Viewer, query: string, depth: string): Promise<string | null> {
+export async function createSearch(
+  viewer: Viewer,
+  query: string,
+  depth: string,
+  length: ReportLength = "full",
+): Promise<string | null> {
   const sql = await db();
   if (!sql) return null;
   const id = crypto.randomUUID();
-  await sql`INSERT INTO searches (id, anon_id, user_email, query, depth) VALUES (${id}, ${viewer.anonId}, ${viewer.email}, ${query}, ${depth})`;
+  await sql`INSERT INTO searches (id, anon_id, user_email, query, depth, report_length)
+    VALUES (${id}, ${viewer.anonId}, ${viewer.email}, ${query}, ${depth}, ${length})`;
   return id;
 }
 

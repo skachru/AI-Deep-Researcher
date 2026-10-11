@@ -13,6 +13,9 @@ const usageMsg = (content = "") =>
   new AIMessage({ content, usage_metadata: { input_tokens: 100, output_tokens: 50, total_tokens: 150 } });
 
 let analysisCalls = 0;
+let planCalls = 0;
+/** Model returns a valid but empty plan, and always reports a high-importance gap. */
+let emptyPlanAlwaysGaps = false;
 /** Delay before the mocked quick summary streams its first token (ms). */
 let summaryDelayMs = 0;
 
@@ -29,6 +32,9 @@ vi.mock("@/lib/llm", async (importActual) => {
     createModel: () => ({
       withStructuredOutput: (schema: unknown) => ({
         invoke: async () => {
+          if (schema === PlanSchema) planCalls += 1;
+          if (schema === PlanSchema && emptyPlanAlwaysGaps)
+            return { raw: usageMsg(), parsed: { subQuestions: [], arxivQuery: "", wikipediaTopics: [] } };
           if (schema === PlanSchema)
             return {
               raw: usageMsg(),
@@ -64,7 +70,7 @@ vi.mock("@/lib/llm", async (importActual) => {
                 ],
                 credibility: [{ sourceId: "S1", score: 90, rationale: "Peer reviewed" }],
                 gaps:
-                  analysisCalls === 1
+                  analysisCalls === 1 || emptyPlanAlwaysGaps
                     ? [
                         {
                           description: "No long-term data",
@@ -135,6 +141,8 @@ process.env.OPENROUTER_API_KEY ??= "sk-or-test";
 describe("research graph", () => {
   beforeEach(() => {
     analysisCalls = 0;
+    planCalls = 0;
+    emptyPlanAlwaysGaps = false;
     summaryDelayMs = 0;
   });
 
@@ -170,6 +178,28 @@ describe("research graph", () => {
     expect(events.filter((e) => e.type === "summary_delta")).toHaveLength(2);
   });
 
+  it("stops the agents when the consumer stops reading early", async () => {
+    summaryDelayMs = 300;
+    const { runResearch } = await import("@/lib/graph/run");
+    const gen = runResearch({ query: "Do AI coding assistants help?", depth: "quick" });
+    for await (const e of gen) if (e.type === "agent_started") break; // consumer leaves after the first agent
+    await new Promise((r) => setTimeout(r, 300));
+    expect(analysisCalls).toBe(0);
+  });
+
+  it("an empty plan can't defeat the two-pass limit", async () => {
+    emptyPlanAlwaysGaps = true;
+    const { runResearch } = await import("@/lib/graph/run");
+    const events: ResearchEvent[] = [];
+    for await (const e of runResearch({ query: "Do AI coding assistants help?", depth: "standard" })) events.push(e);
+    const retrievals = events.filter((e) => e.type === "agent_started" && e.agent === "retriever");
+    expect(planCalls).toBe(1);
+    expect(retrievals).toHaveLength(2);
+    expect(events.some((e) => e.type === "report_ready")).toBe(true);
+    const subs = events.find((e) => e.type === "sub_questions");
+    expect(subs?.type === "sub_questions" && subs.subQuestions[0].question).toBe("Do AI coding assistants help?");
+  });
+
   it("passes the chosen report length to the Report Builder (no Methodology in short reports)", async () => {
     const { runResearch } = await import("@/lib/graph/run");
     const events: ResearchEvent[] = [];
@@ -197,6 +227,7 @@ describe("research graph", () => {
     expect(events.some((e) => e.type === "tool_called" && e.tool === "wikipedia" && e.status === "failed")).toBe(true);
 
     // Hallucinated source id S99 is dropped.
+    expect(events.some((e) => e.type === "insight_added")).toBe(true);
     const finding = events.find((e) => e.type === "finding_added");
     expect(finding?.type === "finding_added" && finding.finding.claims[0].sourceIds).toEqual(["S1", "S2"]);
 

@@ -33,29 +33,78 @@ export function consumeInMemory(rule: LimitRule, now = Date.now()): boolean {
   return entry.count <= rule.limit;
 }
 
-/** Counts one use against the rule and returns whether it is allowed. */
-export async function consumeLimit(rule: LimitRule): Promise<boolean> {
-  const now = Date.now();
+function refundInMemory(rule: LimitRule, now: number): void {
+  const entry = memory.get(bucketFor(rule, now).bucket);
+  if (entry && entry.count > 0) entry.count -= 1;
+}
+
+interface Charge {
+  allowed: boolean;
+  /** Gives the use back (used when a later rule denies the request). */
+  refund: () => Promise<void>;
+}
+
+async function charge(rule: LimitRule, now: number): Promise<Charge> {
+  const memoryCharge = (): Charge => ({
+    allowed: consumeInMemory(rule, now),
+    refund: async () => refundInMemory(rule, now),
+  });
+  let sql: Awaited<ReturnType<typeof db>>;
+  let count: number;
+  const { bucket, expiresAt } = bucketFor(rule, now);
   try {
-    const sql = await db();
-    if (!sql) return consumeInMemory(rule, now);
-    const { bucket, expiresAt } = bucketFor(rule, now);
+    sql = await db();
+    if (!sql) return memoryCharge();
     const rows = (await sql`INSERT INTO rate_limits (bucket, count, expires_at)
       VALUES (${bucket}, 1, ${new Date(expiresAt).toISOString()})
       ON CONFLICT (bucket) DO UPDATE SET count = rate_limits.count + 1
       RETURNING count`) as { count: number }[];
-    if (Math.random() < 0.02) await sql`DELETE FROM rate_limits WHERE expires_at < now()`;
-    return (rows[0]?.count ?? 1) <= rule.limit;
+    count = rows[0]?.count ?? 1;
   } catch (err) {
+    // Only a failed admission query falls back; the database answer is authoritative otherwise.
     console.error("rate limit: database unavailable, using in-memory limits", err);
-    return consumeInMemory(rule, now);
+    return memoryCharge();
   }
+  // Housekeeping is separate: its failure must never change the decision above.
+  if (Math.random() < 0.02) {
+    await sql`DELETE FROM rate_limits WHERE expires_at < now()`.catch((err: unknown) =>
+      console.error("rate limit: cleanup failed", err),
+    );
+  }
+  const conn = sql;
+  return {
+    allowed: count <= rule.limit,
+    refund: async () => {
+      await conn`UPDATE rate_limits SET count = count - 1 WHERE bucket = ${bucket} AND count > 0`.catch(
+        (err: unknown) => console.error("rate limit: refund failed", err),
+      );
+    },
+  };
 }
 
-/** Checks several rules; all of them are counted, and every one must pass. */
+/** Counts one use against the rule and returns whether it is allowed. */
+export async function consumeLimit(rule: LimitRule): Promise<boolean> {
+  return (await charge(rule, Date.now())).allowed;
+}
+
+/**
+ * Admits a request only if every rule allows it. Rules are checked in order
+ * (narrowest first, e.g. user → IP → site-wide), and a denial gives back the
+ * uses already counted, so a visitor who is over their own limit can't burn
+ * the shared site-wide allowance with rejected requests.
+ */
 export async function consumeAll(rules: LimitRule[]): Promise<boolean> {
-  const results = await Promise.all(rules.map(consumeLimit));
-  return results.every(Boolean);
+  const now = Date.now();
+  const charged: Charge[] = [];
+  for (const rule of rules) {
+    const c = await charge(rule, now);
+    if (!c.allowed) {
+      await Promise.all([c, ...charged].map((x) => x.refund()));
+      return false;
+    }
+    charged.push(c);
+  }
+  return true;
 }
 
 /** Best-effort client IP (Vercel sets x-forwarded-for; the first entry is the client). */

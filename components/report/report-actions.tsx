@@ -52,11 +52,12 @@ async function errorFrom(res: Response): Promise<string> {
   return typeof msg === "string" ? msg : `Request failed (${res.status})`;
 }
 
-export async function fetchExport(report: ReportRef, format: "html" | "pdf"): Promise<Blob> {
+export async function fetchExport(report: ReportRef, format: "html" | "pdf", signal?: AbortSignal): Promise<Blob> {
   const res = await fetch("/api/export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ format, report: refBody(report) }),
+    signal,
   });
   if (!res.ok) throw new Error(await errorFrom(res));
   return res.blob();

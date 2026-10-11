@@ -98,3 +98,15 @@ describe("reliability", () => {
     expect(stripTitle(body)).toBe("## Summary\nx\n\n");
   });
 });
+
+describe("reliability counts independent sites", () => {
+  it("does not rate five pages from one site as Strong", () => {
+    const md = "{{Corroborated}} {{Corroborated}} {{Corroborated}} {{Single-source}}";
+    const sameSite = [1, 2, 3, 4, 5].map((n) => ({ type: "web" as const, credibility: 90, url: `https://a.com/${n}` }));
+    const r = computeReliability(md, sameSite);
+    expect(r.sources.sites).toBe(1);
+    expect(r.strength).toBe("Limited");
+    const spread = [1, 2, 3, 4, 5].map((n) => ({ type: "web" as const, credibility: 90, url: `https://s${n}.com/` }));
+    expect(computeReliability(md, spread).strength).toBe("Strong");
+  });
+});

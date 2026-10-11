@@ -4,8 +4,23 @@ export type EvidenceStrength = "Strong" | "Moderate" | "Limited";
 
 export interface Reliability {
   claims: { corroborated: number; singleSource: number; disputed: number; total: number };
-  sources: { total: number; byType: Record<SourceType, number>; avgCredibility: number; highCredibility: number };
+  sources: {
+    total: number;
+    /** Distinct sites among the sources (several pages from one site count once). */
+    sites: number;
+    byType: Record<SourceType, number>;
+    avgCredibility: number;
+    highCredibility: number;
+  };
   strength: EvidenceStrength;
+}
+
+function siteOf(url: string): string {
+  try {
+    return new URL(url).host.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 /**
@@ -14,7 +29,7 @@ export interface Reliability {
  */
 export function computeReliability(
   markdown: string,
-  sources: Pick<SourceSummary, "type" | "credibility">[],
+  sources: (Pick<SourceSummary, "type" | "credibility"> & { url?: string })[],
 ): Reliability {
   const count = (label: string) => (markdown.match(new RegExp(`\\{\\{${label}\\}\\}`, "g")) ?? []).length;
   const corroborated = count("Corroborated");
@@ -28,19 +43,20 @@ export function computeReliability(
     ? Math.round(sources.reduce((n, s) => n + s.credibility, 0) / sources.length)
     : 0;
   const highCredibility = sources.filter((s) => s.credibility >= 75).length;
+  const sites = new Set(sources.map((s, i) => (s.url ? siteOf(s.url) : `#${i}`))).size;
 
   const corroboratedShare = total ? corroborated / total : 0;
   const disputedShare = total ? disputed / total : 0;
   const strength: EvidenceStrength =
-    sources.length >= 5 && corroboratedShare >= 0.6 && avgCredibility >= 60 && disputedShare <= 0.25
+    sites >= 5 && corroboratedShare >= 0.6 && avgCredibility >= 60 && disputedShare <= 0.25
       ? "Strong"
-      : sources.length >= 3 && (corroboratedShare >= 0.3 || avgCredibility >= 60)
+      : sites >= 3 && (corroboratedShare >= 0.3 || avgCredibility >= 60)
         ? "Moderate"
         : "Limited";
 
   return {
     claims: { corroborated, singleSource, disputed, total },
-    sources: { total: sources.length, byType, avgCredibility, highCredibility },
+    sources: { total: sources.length, sites, byType, avgCredibility, highCredibility },
     strength,
   };
 }

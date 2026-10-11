@@ -59,7 +59,7 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
   // History is best-effort: a database problem must not block research.
-  const searchId = await createSearch(viewer, query, depth).catch((err: unknown) => {
+  const searchId = await createSearch(viewer, query, depth, length).catch((err: unknown) => {
     console.error("history: could not create search", err);
     return null;
   });
@@ -80,10 +80,11 @@ export async function POST(request: Request): Promise<Response> {
       const heartbeat = setInterval(() => send(": ping\n\n"), 15_000);
       const startedAt = Date.now();
       let outcome = emptyOutcome();
-      let saved = false;
+      // Writes the run's current outcome. Idempotent: called once the report is ready (so an
+      // immediate download/email finds it) and again at the very end, so events that arrive
+      // after the report (the quick summary, token usage) are kept and a failed early write is retried.
       const save = async () => {
-        if (!searchId || saved) return;
-        saved = true;
+        if (!searchId) return;
         const durationMs = Date.now() - startedAt;
         const write = outcome.report
           ? completeSearch(searchId, {

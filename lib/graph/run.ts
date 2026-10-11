@@ -46,36 +46,52 @@ export async function* runResearch({
     notify();
   };
 
-  // The summary stops when the research ends or the caller cancels.
+  // One controller owns this run: it stops both producers when the caller cancels, when the
+  // run ends, or when the consumer stops iterating early (generator return/throw).
+  const run = new AbortController();
+  const runSignal = signal ? AbortSignal.any([signal, run.signal]) : run.signal;
+  // The summary also stops as soon as the research ends.
   const summaryControl = new AbortController();
-  const summarySignal = signal ? AbortSignal.any([signal, summaryControl.signal]) : summaryControl.signal;
+  const summarySignal = AbortSignal.any([runSignal, summaryControl.signal]);
   let summaryDone = false;
   let graphDone = false;
+  const tasks: Promise<unknown>[] = [];
 
   try {
     const env = getServerEnv(); // fail fast with a readable message if the API key is missing
     await loadModelInfo(env.OPENROUTER_MODEL); // decides the reasoning setting for this model
 
-    void runQuickSummary(query, summarySignal, push).finally(() => {
-      summaryDone = true;
-      notify();
-    });
+    tasks.push(
+      runQuickSummary(query, summarySignal, push)
+        .catch(() => undefined) // optional: never fails the run
+        .finally(() => {
+          summaryDone = true;
+          notify();
+        }),
+    );
 
-    const graphTask = (async () => {
-      const graph = buildResearchGraph();
-      const stream = await graph.stream({ query, depth, length }, { streamMode: "custom", signal, recursionLimit: 12 });
-      for await (const chunk of stream) if (isResearchEvent(chunk)) push(chunk);
-    })();
     let graphError: unknown = null;
-    void graphTask
-      .catch((err: unknown) => {
-        graphError = err ?? new Error("Research failed");
-      })
-      .finally(() => {
-        graphDone = true;
-        summaryControl.abort(); // a summary still streaming after the report is no longer useful
-        notify();
-      });
+    tasks.push(
+      (async () => {
+        const graph = buildResearchGraph();
+        const stream = await graph.stream(
+          { query, depth, length },
+          { streamMode: "custom", signal: runSignal, recursionLimit: 12 },
+        );
+        for await (const chunk of stream) {
+          if (isResearchEvent(chunk)) push(chunk);
+          else console.warn("research: dropped a malformed event", chunk);
+        }
+      })()
+        .catch((err: unknown) => {
+          graphError = err ?? new Error("Research failed");
+        })
+        .finally(() => {
+          graphDone = true;
+          summaryControl.abort(); // a summary still streaming after the report is no longer useful
+          notify();
+        }),
+    );
 
     while (!(graphDone && summaryDone && queue.length === 0)) {
       if (queue.length === 0) await new Promise<void>((resolve) => (wake = resolve));
@@ -85,5 +101,12 @@ export async function* runResearch({
   } catch (err) {
     summaryControl.abort();
     yield stamp({ type: "error", message: errorMessage(err), recoverable: false });
+  } finally {
+    // Runs on normal completion and when the consumer stops early: stop and join the producers.
+    run.abort();
+    notify();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([Promise.allSettled(tasks), new Promise((r) => (timer = setTimeout(r, 5000)))]);
+    clearTimeout(timer);
   }
 }

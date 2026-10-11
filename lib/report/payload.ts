@@ -30,6 +30,15 @@ export const ReportRefSchema = z
   });
 export type ReportRef = z.infer<typeof ReportRefSchema>;
 
+/** A report as the PDF and HTML exporters receive it. */
+export interface ReportDocument {
+  query: string;
+  /** Full report markdown (starts with "# <query>" and a "## Summary" section). */
+  markdown: string;
+  sources?: ExportSource[];
+  generatedAt: Date;
+}
+
 /** The source fields the exports need. */
 export interface ExportSource {
   id: string;

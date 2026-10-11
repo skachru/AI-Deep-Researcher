@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildMethodology, buildReferences } from "@/lib/agents/reporter";
 import { exportMarkdown, extractToc, prepareReportMarkdown } from "@/lib/client/report";
-import { renderReportHtml } from "@/lib/report/html";
 import { linkCitations, renderInteractiveReportHtml, withoutSummary } from "@/lib/report/interactive";
 import { extractSummary, markdownToSafeHtml } from "@/lib/report/markdown";
 import { renderReportPdf, reportToPdfDefinition } from "@/lib/report/pdf";
@@ -90,12 +89,6 @@ describe("report exports", () => {
     expect(html).toContain('<a href="https://ok.com"');
     expect(html).toContain('<span class="claim claim-corroborated">Corroborated</span>');
     expect(html).toContain('<sup class="cite">[2, 3]</sup>');
-  });
-
-  it("wraps HTML in a standalone document", () => {
-    const doc = renderReportHtml({ query: "Is X <true>?", markdown: sample, generatedAt: new Date(0) });
-    expect(doc.startsWith("<!doctype html>")).toBe(true);
-    expect(doc).toContain("<title>Is X &lt;true&gt;? — Lumen research report</title>");
   });
 
   it("builds a PDF definition and renders a real PDF", async () => {

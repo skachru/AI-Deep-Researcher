@@ -32,7 +32,22 @@ async function planQuery(query: string): Promise<{ plan: Plan; usage: Usage }> {
     ),
     new HumanMessage(`Research query: ${query}`),
   ]);
-  return { plan: parsed, usage: usageFrom(raw) };
+  return { plan: usablePlan(parsed, query), usage: usageFrom(raw) };
+}
+
+/**
+ * Validates the model's plan locally: blank entries are dropped and an empty
+ * plan falls back to researching the query itself. Pure.
+ */
+export function usablePlan(plan: Plan, query: string): Plan {
+  const subQuestions = plan.subQuestions
+    .map((sq) => ({ question: sq.question.trim(), searchQuery: sq.searchQuery.trim() || sq.question.trim() }))
+    .filter((sq) => sq.question.length > 0);
+  return {
+    subQuestions: subQuestions.length ? subQuestions : [{ question: query, searchQuery: query }],
+    arxivQuery: plan.arxivQuery.trim() || query,
+    wikipediaTopics: plan.wikipediaTopics.map((t) => t.trim()).filter(Boolean),
+  };
 }
 
 interface ToolJob {
@@ -67,8 +82,10 @@ export async function retrieverAgent(
 ): Promise<ResearchStateUpdate> {
   const startedAt = Date.now();
   const budget = budgetFor(state.depth);
-  const isFollowUp = state.subQuestions.length > 0;
-  const iteration = isFollowUp ? state.iteration + 1 : 0;
+  // Pass number comes from the graph's own counter, not from what the model produced.
+  const passes = state.passes ?? 0;
+  const isFollowUp = passes > 0;
+  const iteration = passes;
   let usage: Usage = ZERO_USAGE;
   const notes: string[] = [];
 
@@ -217,5 +234,5 @@ export async function retrieverAgent(
     durationMs: Date.now() - startedAt,
   });
 
-  return { subQuestions, sources: newSources, evidence, iteration, usage, notes };
+  return { subQuestions, sources: newSources, evidence, iteration, passes: passes + 1, usage, notes };
 }

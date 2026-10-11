@@ -1,7 +1,7 @@
 import { Lexer, type Token, type Tokens } from "marked";
 import type { Content, ContentText, TDocumentDefinitions } from "pdfmake/interfaces";
 import { plainClaims } from "@/lib/report/markdown";
-import type { ReportDocument } from "@/lib/report/html";
+import type { ReportDocument } from "@/lib/report/payload";
 import { computeReliability, STRENGTH_COPY, stripTitle } from "@/lib/report/reliability";
 
 /** Markdown → pdfmake document definition. Pure (unit-tested). */

@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { getSearch } from "@/lib/db/searches";
+import { researchHref } from "@/lib/research-url";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function SavedReportPage({ params }: { params: Promise<{ id
   const search = await getSearch(await getViewer(), id);
   if (!search || !search.report) notFound();
 
-  const rerun = `/research?${new URLSearchParams({ q: search.query, depth: search.depth }).toString()}`;
+  const rerun = researchHref({ query: search.query, depth: search.depth, length: search.length });
   return (
     <div className="min-h-dvh">
       <SiteHeader />

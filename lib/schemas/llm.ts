@@ -78,4 +78,3 @@ export const InsightsSchema = z.object({
     )
     .describe("3 to 5 insights"),
 });
-export type InsightsOutput = z.infer<typeof InsightsSchema>;

@@ -1,4 +1,5 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { ResearchEventSchema } from "@/lib/events/schema";
 import { stamp, type ResearchEvent, type ResearchEventBody } from "@/lib/events/types";
 
 /**
@@ -10,11 +11,7 @@ export function emit(config: LangGraphRunnableConfig | undefined, body: Research
   if (typeof writer === "function") (writer as (chunk: ResearchEvent) => void)(stamp(body));
 }
 
+/** True only for a well-formed event (type, timestamp and payload all checked). */
 export function isResearchEvent(value: unknown): value is ResearchEvent {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { type?: unknown }).type === "string" &&
-    typeof (value as { at?: unknown }).at === "number"
-  );
+  return ResearchEventSchema.safeParse(value).success;
 }

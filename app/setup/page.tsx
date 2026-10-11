@@ -20,8 +20,9 @@ const ICON: Record<CheckStatus, { icon: typeof CheckCircle2; className: string; 
 /**
  * Validates the deployment's configuration live (OpenRouter key and model, Google OAuth
  * client + redirect URI, database, SMTP). Shows no secrets. Open to everyone
- * until an admin has signed in, then admins only. Authorisation is checked
- * before any diagnostic or paid call runs.
+ * until an admin has signed in (or SETUP_LOCKED=true), then admins only.
+ * Authorisation is checked before any diagnostic or paid call runs, and an
+ * indeterminate check (database error) denies access.
  */
 export default async function SetupPage({ searchParams }: { searchParams: Promise<{ test?: string }> }) {
   const { test } = await searchParams;
@@ -32,14 +33,27 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
 
   // Authorise BEFORE running anything: diagnostics are open only until an admin has
   // signed in, and the paid speed test is admin-only (or rate-limited while bootstrapping).
+  // Fails closed: if we can't tell whether an admin has signed in (database error), only admins
+  // get in. SETUP_LOCKED=true locks the page to admins permanently (needed without a database).
   const viewer = await getViewer();
-  const adminExists = viewer.isAdmin ? true : await hasAdminSignedIn(adminEmails()).catch(() => false);
-  if (adminExists && !viewer.isAdmin) {
+  let access: "open" | "locked" | "unknown" = "locked";
+  if (!viewer.isAdmin && process.env.SETUP_LOCKED !== "true") {
+    access = await hasAdminSignedIn(adminEmails()).then(
+      (exists) => (exists ? "locked" : "open"),
+      (err: unknown) => {
+        console.error("setup: could not check for an admin sign-in", err);
+        return "unknown" as const;
+      },
+    );
+  }
+  if (!viewer.isAdmin && access !== "open") {
     return (
       <div className="min-h-dvh">
         <SiteHeader />
         <p className="mx-auto max-w-md px-4 pt-24 text-center text-[13px] text-muted">
-          Setup is complete. Sign in as an admin to view the setup check.
+          {access === "unknown"
+            ? "The setup check is temporarily unavailable. Please try again shortly, or sign in as an admin."
+            : "Setup is complete. Sign in as an admin to view the setup check."}
         </p>
       </div>
     );

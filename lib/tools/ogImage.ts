@@ -141,6 +141,9 @@ function getPage(url: URL): Promise<PageResponse> {
         res.on("error", () => resolve({ status, location, contentType, body }));
       },
     );
+    // `timeout` above is an idle timeout; this caps the whole request (DNS, slow drip-fed pages).
+    const deadline = setTimeout(() => req.destroy(new Error("deadline")), 6000);
+    req.on("close", () => clearTimeout(deadline));
     req.on("timeout", () => req.destroy(new Error("timeout")));
     req.on("error", reject);
     req.end();

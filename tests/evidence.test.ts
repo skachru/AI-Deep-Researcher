@@ -62,26 +62,68 @@ describe("claim labels follow validated evidence", () => {
 });
 
 describe("report citations are checked against real sources", () => {
-  const valid = new Set([1, 2, 3]);
+  // S1 and S3 are on the same site; S2 is independent.
+  const sites = new Map([
+    [1, "a.com"],
+    [2, "b.org"],
+    [3, "a.com"],
+  ]);
 
   it("removes citations to non-existent sources", () => {
-    const out = verifyCitations("A claim [99]. Another [1, 99] and [2][7].", valid);
-    expect(out.markdown).toBe("A claim. Another [1] and [2].");
-    expect(out.removed).toBe(3);
+    const out = verifyCitations("Another [1, 99] and [2][7].", sites);
+    expect(out.markdown).toBe("Another [1] and [2].");
+    expect(out.removed).toBe(2);
   });
 
-  it("downgrades Corroborated tags on lines with fewer than two valid citations", () => {
+  it("removes claim bullets left without a valid source instead of relabelling them", () => {
     const out = verifyCitations(
-      "- One source [1] {{Corroborated}}\n- Two [1][2] {{Corroborated}}\n- Fake [9] {{Corroborated}}",
-      valid,
+      "- Fake [9] {{Corroborated}}\n- Uncited claim {{Single-source}}\n- Real [2] {{Single-source}}",
+      sites,
+    );
+    expect(out.markdown).toBe("- Real [2] {{Single-source}}");
+    expect(out.dropped).toBe(2);
+  });
+
+  it("marks other prose that lost all its citations", () => {
+    expect(verifyCitations("Overall it helps [42].", sites).markdown).toBe("Overall it helps. *(source not verified)*");
+    expect(verifyCitations("## Key Findings", sites).markdown).toBe("## Key Findings");
+  });
+
+  it("needs two different sites for Corroborated, like the analyst", () => {
+    const out = verifyCitations(
+      "- Same site [1][3] {{Corroborated}}\n- Two sites [1][2] {{Corroborated}}\n- One [2] {{Corroborated}}",
+      sites,
     );
     expect(out.markdown).toBe(
-      "- One source [1] {{Single-source}}\n- Two [1][2] {{Corroborated}}\n- Fake {{Single-source}}",
+      "- Same site [1][3] {{Single-source}}\n- Two sites [1][2] {{Corroborated}}\n- One [2] {{Single-source}}",
     );
     expect(out.downgraded).toBe(2);
   });
 
   it("leaves markdown links alone", () => {
-    expect(verifyCitations("See [5](https://x.com)", valid).markdown).toBe("See [5](https://x.com)");
+    expect(verifyCitations("See [5](https://x.com)", sites).markdown).toBe("See [5](https://x.com)");
+  });
+});
+
+describe("report completeness", () => {
+  it("detects an empty or summary-less draft and builds the report from the findings", async () => {
+    const { fallbackReportBody, isCompleteReport } = await import("@/lib/agents/reporter");
+    expect(isCompleteReport("", 30)).toBe(false);
+    expect(isCompleteReport("## Key Findings\n- a b c d e f g", 3)).toBe(false);
+    expect(isCompleteReport("## Summary\n- yes it does help a lot", 5)).toBe(true);
+    const body = fallbackReportBody({
+      findings: [
+        {
+          subQuestionId: "Q1",
+          question: "Does it help?",
+          summary: "Mostly yes.",
+          claims: [{ text: "Faster", status: "Corroborated", sourceIds: ["S1", "S2"] }],
+        },
+      ],
+      contradictions: [],
+      insights: [],
+    });
+    expect(body).toContain("## Summary\n- Mostly yes.");
+    expect(body).toContain("- Faster [1, 2] {{Corroborated}}");
   });
 });

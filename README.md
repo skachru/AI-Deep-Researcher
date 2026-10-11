@@ -78,6 +78,7 @@ Other scripts:
 | `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET`                    | For Google sign-in | OAuth client ("Web application") from Google Cloud. Redirect URI: `https://<domain>/api/auth/google/callback`.                                                                               |
 | `OPENROUTER_REASONING`                                       | No                 | `auto` (default) switches "thinking" off on reasoning models (or keeps it low where mandatory) so runs stay inside the time limit. Set `low`/`medium`/`high` for more depth on a fast model. |
 | `APP_URL`                                                    | No                 | Pins the public URL used for the Google redirect (otherwise taken from the request).                                                                                                         |
+| `SETUP_LOCKED`                                               | No                 | `true` makes `/setup` admin-only permanently (recommended once set up, and needed without a database).                                                                                       |
 | `ADMIN_EMAILS`                                               | No                 | Comma-separated admin emails. Defaults to `skachru@gmail.com`.                                                                                                                               |
 | `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `EMAIL_FROM` | For email          | Any SMTP provider. Gmail: `smtp.gmail.com`, port `465`, your address and a Google [app password](https://myaccount.google.com/apppasswords).                                                 |
 | `RUNS_PER_HOUR` `RUNS_PER_IP_HOUR` `RUNS_PER_DAY`            | No                 | Research limits: per visitor per hour (10), per IP per hour (20), whole site per day (300). Admins are exempt.                                                                               |
@@ -116,12 +117,12 @@ Each feature switches on when its environment variables are set; without them th
 
 **Safety and cost controls.** Research, email, export, sign-in and preview-image requests are rate-limited per visitor,
 per IP and (for paid operations) site-wide. Limits use an atomic Postgres counter (`rate_limits` table) and fall back to
-an in-memory counter when no database is configured or it is unreachable — they are never switched off. Report claims
+an in-memory counter (per server instance) when no database is configured or it is unreachable — they are never switched off. Rules are checked narrowest first and a denied request gives back what it was charged, so one visitor can't use up the site-wide allowance. Report claims
 are re-labelled from the validated evidence ("Corroborated" needs two different sites), citations to non-existent
 sources are removed, post-sign-in redirects only allow same-site paths, and the preview-image fetcher pins every
 connection to an address it has verified is public (no private-network access, including via DNS rebinding).
 
-**Setup check:** open `/setup` on your deployment. Its **speed test** times one structured call and one web search with your model, so you can tell at once whether a model is fast enough. It tests the OpenRouter key (and remaining credit), the chosen model's capabilities, the Google OAuth client ID/secret and
+**Setup check:** open `/setup` on your deployment (open until an admin signs in or `SETUP_LOCKED=true`; if that can't be verified, access is denied). Its **speed test** times one structured call and one web search with your model, so you can tell at once whether a model is fast enough. It tests the OpenRouter key (and remaining credit), the chosen model's capabilities, the Google OAuth client ID/secret and
 redirect URI (against Google itself), the database and SMTP login, and says exactly what to fix. No secrets are shown;
 once someone has signed in, the page is admin-only.
 

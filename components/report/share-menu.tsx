@@ -2,7 +2,7 @@
 
 import { Check, Download, FileText, Globe, Loader2, Mail, MessageCircle, Send, Share2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchExport, type ReportRef, saveBlob } from "@/components/report/report-actions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -25,7 +25,12 @@ const APPS: { id: ShareTarget; label: string; className: string; icon: React.Rea
   { id: "outlook", label: "Outlook", className: "bg-[#0078d4] text-white", icon: <Mail /> },
 ];
 
-type Files = { status: "idle" | "loading" } | { status: "ready"; files: File[] } | { status: "error"; error: string };
+/** Prepared attachments, tagged with the report they were made for. */
+type Files =
+  | { status: "idle" }
+  | { status: "loading"; key: string }
+  | { status: "ready"; key: string; files: File[] }
+  | { status: "error"; key: string; error: string };
 
 async function toAttachment(file: File): Promise<Attachment> {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -63,14 +68,70 @@ export function ShareMenu({ report }: { report: ReportRef }) {
   const subject = shareSubject(report.query);
   const emailOn = Boolean(me?.features.email);
 
-  // Files are made once per report; a changed report (e.g. a new run) needs fresh files.
-  const filesFor = useRef<string | null>(null);
+  // Attachments belong to one exact report (question, text and sources). A newer report or a
+  // reopened menu starts a new preparation; responses from an older one are ignored.
+  const reportKey = useMemo(
+    () =>
+      JSON.stringify([
+        report.searchId,
+        report.query,
+        report.markdown,
+        report.sources.map((s) => [s.id, s.url, s.title, s.credibility, s.image ?? null]),
+      ]),
+    [report],
+  );
+  const generation = useRef(0);
+  const inflight = useRef<AbortController | null>(null);
+  const isOpen = useRef(false);
+
+  const prepare = useCallback(async () => {
+    if ((files.status === "loading" || files.status === "ready") && files.key === reportKey) return;
+    inflight.current?.abort();
+    const controller = new AbortController();
+    inflight.current = controller;
+    const gen = ++generation.current;
+    const key = reportKey;
+    const current = () => gen === generation.current && !controller.signal.aborted;
+    setFiles({ status: "loading", key });
+    try {
+      const [pdf, html] = await Promise.all([
+        fetchExport(report, "pdf", controller.signal),
+        fetchExport(report, "html", controller.signal),
+      ]);
+      if (!current()) return;
+      setFiles({
+        status: "ready",
+        key,
+        files: [
+          new File([pdf], `${name}.pdf`, { type: "application/pdf" }),
+          new File([html], `${name}.html`, { type: "text/html" }),
+        ],
+      });
+    } catch (err) {
+      if (!current()) return;
+      setFiles({ status: "error", key, error: err instanceof Error ? err.message : "Could not prepare the files" });
+    }
+  }, [files, reportKey, report, name]);
+
+  // The report changed: drop old attachments (and any in-flight preparation) and, if the menu
+  // is open, prepare the new ones.
+  const lastKey = useRef(reportKey);
   useEffect(() => {
-    if (filesFor.current !== null && filesFor.current !== report.markdown) setFiles({ status: "idle" });
-  }, [report.markdown]);
+    if (lastKey.current === reportKey) return;
+    lastKey.current = reportKey;
+    inflight.current?.abort();
+    generation.current += 1;
+    setFiles({ status: "idle" });
+    setDownloaded(false);
+  }, [reportKey]);
+  useEffect(() => {
+    if (isOpen.current && files.status === "idle") void prepare();
+  }, [files.status, prepare]);
+  useEffect(() => () => inflight.current?.abort(), []);
 
   // Each time the menu opens, every option is available again.
   const onOpenChange = (open: boolean) => {
+    isOpen.current = open;
     if (!open) return;
     setDownloaded(false);
     setPendingDownload(false);
@@ -79,25 +140,7 @@ export function ShareMenu({ report }: { report: ReportRef }) {
     void prepare();
   };
 
-  const prepare = async () => {
-    if (files.status === "loading" || (files.status === "ready" && filesFor.current === report.markdown)) return;
-    filesFor.current = report.markdown;
-    setFiles({ status: "loading" });
-    try {
-      const [pdf, html] = await Promise.all([fetchExport(report, "pdf"), fetchExport(report, "html")]);
-      setFiles({
-        status: "ready",
-        files: [
-          new File([pdf], `${name}.pdf`, { type: "application/pdf" }),
-          new File([html], `${name}.html`, { type: "text/html" }),
-        ],
-      });
-    } catch (err) {
-      setFiles({ status: "error", error: err instanceof Error ? err.message : "Could not prepare the files" });
-    }
-  };
-
-  const ready = files.status === "ready" ? files.files : null;
+  const ready = files.status === "ready" && files.key === reportKey ? files.files : null;
   // Share the files the platform accepts (some don't take HTML); null when file sharing isn't supported.
   const shareable = (() => {
     if (!ready || typeof navigator === "undefined" || typeof navigator.canShare !== "function") return null;

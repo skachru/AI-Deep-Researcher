@@ -9,6 +9,10 @@ const hash = (token: string) => createHash("sha256").update(token).digest("hex")
 export async function createLoginToken(email: string): Promise<string> {
   const sql = await db();
   if (!sql) throw new Error("Sign-in needs a database (DATABASE_URL).");
+  // Housekeeping: expired tokens are useless after a day (best effort).
+  await sql`DELETE FROM login_tokens WHERE expires_at < now() - interval '1 day'`.catch((err: unknown) =>
+    console.error("login: token cleanup failed", err),
+  );
   const recent = (await sql`SELECT count(*)::int AS n FROM login_tokens
     WHERE email = ${email} AND expires_at > now()`) as { n: number }[];
   if ((recent[0]?.n ?? 0) >= 3) throw new Error("Too many sign-in links requested. Try again in 15 minutes.");

@@ -1,4 +1,4 @@
-import type { ReportDocument } from "@/lib/report/html";
+import type { ReportDocument } from "@/lib/report/payload";
 import { extractSummary, markdownToSafeHtml } from "@/lib/report/markdown";
 import type { ExportSource } from "@/lib/report/payload";
 import { computeReliability, splitReferences, STRENGTH_COPY, stripTitle } from "@/lib/report/reliability";
@@ -217,7 +217,7 @@ var d=document,root=d.documentElement;root.classList.remove('nojs');
 try{var t=localStorage.getItem('lumen-theme');if(t)root.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)root.dataset.theme='dark'}catch(e){}
 d.getElementById('theme').onclick=function(){var n=root.dataset.theme==='dark'?'light':'dark';root.dataset.theme=n;try{localStorage.setItem('lumen-theme',n)}catch(e){}};
 d.getElementById('print').onclick=function(){d.querySelectorAll('.sec.closed').forEach(function(s){s.classList.remove('closed')});window.print()};
-var art=d.querySelector('article'),top=d.querySelector('.top'),bar=d.querySelector('.progress');
+var art=d.querySelector('article'),host=d.querySelector('main')||art,top=d.querySelector('.top'),bar=d.querySelector('.progress');
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
 /* wrap each h2 section so it can collapse */
 var hs=[].slice.call(art.querySelectorAll(':scope > h2'));
@@ -234,14 +234,14 @@ addEventListener('scroll',spy,{passive:true});spy();
 /* claim filters */
 var claims=[].slice.call(art.querySelectorAll('.claim'));claims.forEach(function(c){var el=c.closest('li,p');if(el)el.dataset.claim=c.textContent});
 d.querySelectorAll('.f').forEach(function(b){b.onclick=function(){var f=b.dataset.f;d.querySelectorAll('.f').forEach(function(x){x.classList.toggle('on',x===b)});art.querySelectorAll('[data-claim]').forEach(function(el){el.classList.toggle('dim',f!=='all'&&el.dataset.claim!==f)})}});
-/* citation previews + jump to source */
+/* citation previews + jump to source (Key takeaways and the report body) */
 var tip=d.createElement('div');tip.className='tip';d.body.appendChild(tip);
 function card(n){return d.getElementById('src-'+n)}
-art.addEventListener('mouseover',function(e){var a=e.target.closest&&e.target.closest('a.cite');if(!a)return;var c=card(a.dataset.n);if(!c)return;
+host.addEventListener('mouseover',function(e){var a=e.target.closest&&e.target.closest('a.cite');if(!a)return;var c=card(a.dataset.n);if(!c)return;
 tip.textContent='';var m=d.createElement('div');m.className='m';m.textContent=c.dataset.meta;var tt=d.createElement('div');tt.className='t';tt.textContent=c.querySelector('.src-title').textContent;var cr=d.createElement('div');cr.className='m';cr.textContent=c.querySelector('.cred-l').textContent+' · click to view';tip.append(m,tt,cr);
 var r=a.getBoundingClientRect();tip.style.left=Math.max(8,Math.min(innerWidth-330,r.left-20))+'px';tip.style.top=(r.bottom+8+120>innerHeight?r.top-tip.offsetHeight-8:r.bottom+8)+'px';tip.classList.add('show')});
-art.addEventListener('mouseout',function(e){if(e.target.closest&&e.target.closest('a.cite'))tip.classList.remove('show')});
-art.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a.cite');if(!a)return;var c=card(a.dataset.n);if(!c)return;e.preventDefault();tip.classList.remove('show');
+host.addEventListener('mouseout',function(e){if(e.target.closest&&e.target.closest('a.cite'))tip.classList.remove('show')});
+host.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a.cite');if(!a)return;var c=card(a.dataset.n);if(!c)return;e.preventDefault();tip.classList.remove('show');
 var s=d.querySelector('.f-src[data-t="all"]');if(s)s.click();c.scrollIntoView({behavior:'smooth',block:'center'});c.classList.remove('flash');void c.offsetWidth;c.classList.add('flash')});
 /* source type filter */
 d.querySelectorAll('.f-src').forEach(function(b){b.onclick=function(){var t=b.dataset.t;d.querySelectorAll('.f-src').forEach(function(x){x.classList.toggle('on',x===b)});d.querySelectorAll('.src').forEach(function(s){s.classList.toggle('hide',t!=='all'&&s.dataset.type!==t)})}});

@@ -49,6 +49,8 @@ export const ResearchState = Annotation.Root({
   insights: Annotation<Insight[]>({ reducer: replace, default: () => [] }),
   /** Index of the latest retrieval pass: 0 = first pass, 1 = multi-hop follow-up. */
   iteration: Annotation<number>({ reducer: replace, default: () => 0 }),
+  /** Completed retrieval passes. Counted by the graph, never inferred from model output. */
+  passes: Annotation<number>({ reducer: replace, default: () => 0 }),
   report: Annotation<string>({ reducer: replace, default: () => "" }),
   usage: Annotation<Usage>({ reducer: addUsage, default: () => ZERO_USAGE }),
   /** Methodology notes, e.g. sources that failed. Shown in the report. */
