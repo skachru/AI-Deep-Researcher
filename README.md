@@ -100,8 +100,10 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
   rendered server-side with pdfmake). The HTML (`lib/report/interactive.ts`) is a self-contained page with key takeaways,
   an evidence ring, claim filters, citation previews that jump to the source, source filters, dark mode and print; all
   report text is sanitised because it derives from web content. **Print** prints that designed report, not the app.
-- **Email:** after each report the user is asked for their email; `POST /api/email` sends the report as HTML with the PDF and
-  the interactive HTML attached (rate-limited per user, per IP and overall).
+- **Share:** the Share menu creates an unlisted link (`POST /api/share`, random id) to a read-only copy of a saved report
+  at `/share/<id>`, with link previews, and opens it in WhatsApp, Gmail, Telegram, LinkedIn, X, Outlook, the email app or
+  the phone's share sheet. Without a database the key findings are shared as text instead. (`POST /api/email` still
+  exists for SMTP delivery but is no longer shown in the UI.)
 - **Admin:** `/admin` (only for `ADMIN_EMAILS`) shows searches, success rate, users, average run time, tokens, emails sent,
   searches per day, top questions and recent searches.
 

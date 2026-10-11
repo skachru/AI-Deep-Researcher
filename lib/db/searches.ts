@@ -133,3 +133,45 @@ export async function recordEmailDelivery(searchId: string | null, recipient: st
   if (!sql) return;
   await sql`INSERT INTO email_deliveries (search_id, recipient, anon_id) VALUES (${searchId}, ${recipient}, ${anonId})`;
 }
+
+/** A read-only copy of a report that anyone with its share link can open. */
+export interface SharedReport {
+  shareId: string;
+  query: string;
+  report: string;
+  sources: SourceSummary[];
+  createdAt: string;
+}
+
+/**
+ * Returns the share id for a finished search the viewer owns, creating one on
+ * first use. The id is random (unguessable), so only people given the link can
+ * open the report. Null when there is no database or the viewer doesn't own it.
+ */
+export async function shareSearch(viewer: Viewer, id: string): Promise<string | null> {
+  const sql = await db();
+  if (!sql) return null;
+  const record = await getSearch(viewer, id);
+  if (!record?.report || (record.anonId !== viewer.anonId && record.userEmail !== viewer.email)) return null;
+  const token = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
+  const rows = (await sql`UPDATE searches SET share_id = COALESCE(share_id, ${token}) WHERE id = ${id}
+    RETURNING share_id`) as { share_id: string }[];
+  return rows[0]?.share_id ?? null;
+}
+
+export async function getSharedReport(shareId: string): Promise<SharedReport | null> {
+  const sql = await db();
+  if (!sql) return null;
+  const rows = (await sql`SELECT * FROM searches WHERE share_id = ${shareId} AND status = 'done'`) as (SearchRow & {
+    share_id: string;
+  })[];
+  const r = rows[0];
+  if (!r?.report) return null;
+  return {
+    shareId: r.share_id,
+    query: r.query,
+    report: r.report,
+    sources: r.sources ?? [],
+    createdAt: iso(r.created_at),
+  };
+}

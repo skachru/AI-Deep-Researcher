@@ -155,3 +155,17 @@ describe("interactive HTML report", () => {
     expect(doc).not.toContain('class="cta"');
   });
 });
+
+describe("share messages", () => {
+  it("shares plain key findings and a link through each app", async () => {
+    const { buildShareMessage, shareBullets, shareHref } = await import("@/lib/client/share");
+    expect(shareBullets(sample)).toEqual(["Yes, mostly", "With caveats"]);
+    const m = buildShareMessage("Is X true?", sample, "https://lumen.app/share/abc", true);
+    expect(m.text).toContain("• Yes, mostly");
+    expect(m.text).not.toContain("{{");
+    expect(shareHref("whatsapp", m)).toMatch(/^https:\/\/wa\.me\/\?text=.*lumen\.app%2Fshare%2Fabc$/);
+    expect(shareHref("telegram", m)).toContain("t.me/share/url?url=https%3A%2F%2Flumen.app%2Fshare%2Fabc");
+    expect(shareHref("gmail", m)).toContain("mail.google.com/mail/?view=cm&fs=1&su=Research%20report");
+    expect(shareHref("email", m).startsWith("mailto:?subject=")).toBe(true);
+  });
+});

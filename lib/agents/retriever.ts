@@ -41,6 +41,20 @@ interface ToolJob {
   run: () => Promise<{ sources: RawSource[]; usage?: Usage }>;
 }
 
+const TOOL_LABEL: Record<string, string> = {
+  web_search: "Web search",
+  news_search: "News search",
+  arxiv: "arXiv search",
+  wikipedia: "Wikipedia lookup",
+};
+
+/** A short, readable Methodology note for a source that failed. Pure. */
+export function failureNote(tool: string, input: string, error: string): string {
+  const reason = error.split(/:\s/)[0].slice(0, 80);
+  const topic = input.length > 70 ? `${input.slice(0, 67)}…` : input;
+  return `${TOOL_LABEL[tool] ?? tool} for "${topic}" was unavailable (${reason}); the report uses the other sources.`;
+}
+
 /**
  * Agent 1 — Contextual Retriever.
  * Pass 0: decompose the query, fetch web/news/arXiv/Wikipedia in parallel.
@@ -144,7 +158,7 @@ export async function retrieverAgent(
         resultCount: outcome.ok ? outcome.value.sources.length : 0,
         detail: outcome.ok ? undefined : outcome.error,
       });
-      if (!outcome.ok) notes.push(`${job.tool} failed for "${job.input}" (${outcome.error}); continued without it.`);
+      if (!outcome.ok) notes.push(failureNote(job.tool, job.input, outcome.error));
       return outcome.ok ? outcome.value : { sources: [] };
     }),
   );

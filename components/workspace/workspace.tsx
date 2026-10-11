@@ -9,7 +9,6 @@ import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
-import { EmailReport } from "@/components/report/report-actions";
 import { AgentGraph } from "@/components/workspace/agent-graph";
 import { QuickSummary } from "@/components/workspace/quick-summary";
 import { SideTabs } from "@/components/workspace/side-tabs";
@@ -173,13 +172,7 @@ export function Workspace({ query, depth, replay }: { query: string; depth: Dept
             </Card>
 
             <div className="flex min-h-0 flex-col gap-4">
-              <QuickSummary query={query} view={state} onOpenReport={() => setView("report")}>
-                {state.report && (
-                  <EmailReport
-                    report={{ searchId: state.searchId, query, markdown: state.report, sources: state.sources }}
-                  />
-                )}
-              </QuickSummary>
+              <QuickSummary query={query} view={state} onOpenReport={() => setView("report")} />
               <Card className="flex min-h-[320px] flex-1 flex-col overflow-hidden">
                 <CardHeader>
                   Activity

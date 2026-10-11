@@ -196,7 +196,7 @@ describe("research graph", () => {
       expect(report.report).toContain("## Summary");
       expect(report.report).toContain("## Methodology");
       expect(report.report).toContain("## References");
-      expect(report.report).toContain("wikipedia failed");
+      expect(report.report).toContain("Wikipedia lookup for");
       expect(report.sources.length).toBeGreaterThan(3);
       expect(report.sources.every((s) => !("content" in s))).toBe(true);
     }

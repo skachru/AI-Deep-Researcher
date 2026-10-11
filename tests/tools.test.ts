@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildArxivUrl, parseArxivFeed, searchArxiv } from "@/lib/tools/arxiv";
+import { arxivTerms, buildArxivUrl, parseArxivFeed, searchArxiv } from "@/lib/tools/arxiv";
 import { blendCredibility, heuristicCredibility } from "@/lib/tools/credibility";
 import { fetchWithRetry } from "@/lib/tools/http";
 import { capSources, chunkText, dedupeSources, normaliseUrl } from "@/lib/tools/rank";
@@ -42,9 +42,17 @@ describe("arXiv parser", () => {
   });
 
   it("builds an AND query from sanitised keywords", () => {
-    expect(buildArxivUrl("AI coding: productivity!", 3)).toContain(
+    expect(buildArxivUrl(arxivTerms("AI coding: productivity!"), 3)).toContain(
       "search_query=all:AI+AND+all:coding+AND+all:productivity",
     );
+  });
+
+  it("strips arXiv syntax the model may write and caps the term count", () => {
+    const terms = arxivTerms(
+      'all:"Jev company market leadership competitive analysis" OR all:"market leader comparison benchmarking strategy"',
+    );
+    expect(terms).toEqual(["Jev", "company", "market", "leadership", "competitive"]);
+    expect(buildArxivUrl(terms, 4)).not.toMatch(/all:(all|OR)\b/);
   });
 
   it("fetches through the network layer (mocked)", async () => {
@@ -221,5 +229,14 @@ describe("fetchWithRetry", () => {
     const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 404 }));
     await expect(fetchWithRetry("https://example.com", { baseDelayMs: 1 })).rejects.toThrow("HTTP 404");
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("source failure notes", () => {
+  it("keep the reason short and drop error-page bodies", async () => {
+    const { failureNote } = await import("@/lib/agents/retriever");
+    expect(failureNote("arxiv", "market share", "HTTP 400 from export.arxiv.org: <?xml version='1.0'?>")).toBe(
+      'arXiv search for "market share" was unavailable (HTTP 400 from export.arxiv.org); the report uses the other sources.',
+    );
   });
 });

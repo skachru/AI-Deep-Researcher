@@ -39,6 +39,8 @@ async function ensureSchema(sql: NeonQueryFunction<false, false>): Promise<void>
     )`;
     await sql`CREATE INDEX IF NOT EXISTS searches_anon_idx ON searches (anon_id, created_at DESC)`;
     await sql`CREATE INDEX IF NOT EXISTS searches_email_idx ON searches (user_email, created_at DESC)`;
+    await sql`ALTER TABLE searches ADD COLUMN IF NOT EXISTS share_id text`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS searches_share_idx ON searches (share_id)`;
     await sql`CREATE TABLE IF NOT EXISTS email_deliveries (
       id bigserial PRIMARY KEY,
       search_id text,

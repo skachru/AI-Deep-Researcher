@@ -15,7 +15,11 @@ export const PlanSchema = z.object({
       }),
     )
     .describe("3 to 5 sub-questions"),
-  arxivQuery: z.string().describe("Keywords (2–5 words) to search arXiv for relevant research papers"),
+  arxivQuery: z
+    .string()
+    .describe(
+      "2–5 plain keywords to search arXiv for relevant research papers. No quotes, field prefixes (all:, ti:) or AND/OR operators.",
+    ),
   wikipediaTopics: z.array(z.string()).describe("1–2 Wikipedia article topics for background"),
 });
 export type Plan = z.infer<typeof PlanSchema>;

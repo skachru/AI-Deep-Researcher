@@ -4,7 +4,7 @@ import { isValidElement, useEffect, useMemo, useState, type ReactNode } from "re
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
-import { EmailReport, ReportActions } from "@/components/report/report-actions";
+import { ReportActions } from "@/components/report/report-actions";
 import { ReliabilityPanel } from "@/components/report/reliability-panel";
 import { SourceThumb } from "@/components/report/source-thumb";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -155,11 +155,14 @@ export function ReportView({
   sources,
   query,
   searchId,
+  shareUrl,
 }: {
   report: string;
   sources: SourceSummary[];
   query: string;
   searchId: string | null;
+  /** Existing public link (on shared pages); otherwise one is created on demand. */
+  shareUrl?: string;
 }) {
   const ref = useMemo(() => ({ searchId, query, markdown: report, sources }), [searchId, query, report, sources]);
   const { body } = useMemo(() => splitReferences(report), [report]);
@@ -234,7 +237,7 @@ export function ReportView({
       <article className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-card">
         <ReportCover query={query} image={cover} sourceCount={sources.length} />
         <div className="px-6 pt-6 pb-10 sm:px-10">
-          <ReportActions report={ref} />
+          <ReportActions report={ref} shareUrl={shareUrl} />
           <ReliabilityPanel data={reliability} className="mt-6" />
           <div className="prose-report mt-2">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
@@ -253,7 +256,6 @@ export function ReportView({
               ))}
             </ul>
           </section>
-          <EmailReport report={ref} className="mt-10" />
         </div>
       </article>
     </div>

@@ -1,18 +1,6 @@
 "use client";
 
-import {
-  Check,
-  ChevronDown,
-  Copy,
-  Download,
-  FileDown,
-  FileText,
-  Loader2,
-  Mail,
-  Printer,
-  Send,
-  Sparkles,
-} from "lucide-react";
+import { Check, ChevronDown, Copy, Download, FileDown, FileText, Loader2, Printer, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,12 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ShareMenu } from "@/components/report/share-menu";
 import { exportMarkdown } from "@/lib/client/report";
 import type { SourceSummary } from "@/lib/schemas/domain";
-import { useMe } from "@/lib/client/useMe";
 import { slugify } from "@/lib/demo/examples";
-import { cn } from "@/lib/utils";
 
 export interface ReportRef {
   searchId: string | null;
@@ -107,7 +93,7 @@ async function printReport(report: ReportRef): Promise<void> {
   win.print();
 }
 
-export function ReportActions({ report }: { report: ReportRef }) {
+export function ReportActions({ report, shareUrl }: { report: ReportRef; shareUrl?: string }) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<"html" | "pdf" | "print" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +121,7 @@ export function ReportActions({ report }: { report: ReportRef }) {
   return (
     <div className="flex flex-col items-end gap-1.5 print:hidden">
       <div className="flex items-center justify-end gap-2">
-        <EmailButton report={report} />
+        <ShareMenu report={report} presetUrl={shareUrl} />
         <Button size="sm" onClick={() => run("print")} disabled={busy !== null} aria-label="Print report">
           {busy === "print" ? <Loader2 className="animate-spin" /> : <Printer />}
           <span className="hidden sm:inline">Print</span>
@@ -192,117 +178,5 @@ function MenuLabel({ title, hint }: { title: string; hint?: string }) {
       <span className="font-medium">{title}</span>
       {hint && <span className="mt-0.5 text-[11.5px] text-subtle">{hint}</span>}
     </span>
-  );
-}
-
-/** Toolbar button that asks for an email address and sends the report there. */
-function EmailButton({ report }: { report: ReportRef }) {
-  const me = useMe();
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button size="sm" aria-label="Email report">
-          <Mail />
-          <span className="hidden sm:inline">Email</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent>
-        <div className="mb-1 font-medium">Email this report</div>
-        {me && !me.features.email ? (
-          <p className="text-[12.5px] text-muted">
-            Email delivery isn&apos;t switched on for this site yet. Please download the report instead.
-            {me.isAdmin && (
-              <span className="mt-2 block text-subtle">
-                Admin: add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and EMAIL_FROM in Vercel, then redeploy.
-              </span>
-            )}
-          </p>
-        ) : (
-          <>
-            <p className="text-[12.5px] text-muted">
-              We&apos;ll send it with a PDF and an interactive HTML version attached.
-            </p>
-            <EmailForm report={report} className="mt-3" autoFocus />
-          </>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/** Email address field + send button, shared by the toolbar popover and the inline card. */
-function EmailForm({ report, className, autoFocus }: { report: ReportRef; className?: string; autoFocus?: boolean }) {
-  const me = useMe();
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
-  const value = email || me?.email || "";
-
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setState("sending");
-    setMessage(null);
-    try {
-      const res = await fetch("/api/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: value, report: refBody(report) }),
-      });
-      if (!res.ok) throw new Error(await errorFrom(res));
-      setState("sent");
-      setMessage(`Sent to ${value}. Check your inbox (and spam folder) in a minute.`);
-    } catch (err) {
-      setState("error");
-      setMessage(err instanceof Error ? err.message : "Could not send");
-    }
-  };
-
-  return (
-    <form onSubmit={send} className={className} aria-label="Email this report">
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          type="email"
-          required
-          autoFocus={autoFocus}
-          value={value}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (state !== "sending") setState("idle");
-          }}
-          placeholder="you@example.com"
-          aria-label="Email address"
-          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2.5 text-[13px] outline-none focus:border-accent/60"
-        />
-        <Button type="submit" variant="primary" disabled={state === "sending" || state === "sent" || !value}>
-          {state === "sending" ? <Loader2 className="animate-spin" /> : state === "sent" ? <Check /> : <Send />}
-          {state === "sent" ? "Sent" : "Send"}
-        </Button>
-      </div>
-      {message && (
-        <p className={cn("mt-2 text-[12px]", state === "error" ? "text-danger" : "text-success")}>{message}</p>
-      )}
-    </form>
-  );
-}
-
-/** Invites the reader to get the report by email; pre-fills the signed-in address. */
-export function EmailReport({ report, className }: { report: ReportRef; className?: string }) {
-  const me = useMe();
-  if (me && !me.features.email) return null;
-  return (
-    <div className={cn("rounded-lg border border-accent/25 bg-accent-soft/60 p-4 print:hidden", className)}>
-      <div className="flex items-start gap-3">
-        <span className="grid size-8 shrink-0 place-items-center rounded-md bg-surface text-accent shadow-card">
-          <Mail className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-medium">Want this report in your inbox?</div>
-          <p className="text-[12.5px] text-muted">
-            Share your email and we&apos;ll send the full report with a PDF and an interactive HTML version attached.
-          </p>
-          <EmailForm report={report} className="mt-3" />
-        </div>
-      </div>
-    </div>
   );
 }

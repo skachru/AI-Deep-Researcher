@@ -38,9 +38,11 @@ export async function fetchWithRetry(url: string, options: FetchRetryOptions = {
       });
       if (res.ok) return res;
       if (!isRetryableStatus(res.status) || attempt === retries) {
-        const detail = await res.text().catch(() => "");
+        const body = (await res.text().catch(() => "")).trim();
+        // Keep short plain-text reasons; drop HTML/XML error pages (they end up in report notes).
+        const detail = body && !body.startsWith("<") ? body.replace(/\s+/g, " ") : "";
         throw new NonRetryableError(
-          `HTTP ${res.status} from ${new URL(url).host}${detail ? `: ${detail.slice(0, 300)}` : ""}`,
+          `HTTP ${res.status} from ${new URL(url).host}${detail ? `: ${detail.slice(0, 200)}` : ""}`,
         );
       }
       lastError = new Error(`HTTP ${res.status}`);
