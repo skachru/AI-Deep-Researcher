@@ -23,6 +23,7 @@ const RUN_DEADLINE_MS = (maxDuration - 15) * 1000;
 const BodySchema = z.object({
   query: z.string().trim().min(8, "Please ask a fuller question").max(500),
   depth: z.enum(["quick", "standard"]).default("quick"),
+  length: z.enum(["short", "medium", "full"]).default("full"),
 });
 
 /** POST /api/research — streams typed research events as Server-Sent Events and saves the run to history. */
@@ -37,7 +38,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: err instanceof Error ? err.message : "Server misconfigured" }, { status: 500 });
   }
 
-  const { query, depth } = parsed.data;
+  const { query, depth, length } = parsed.data;
   const viewer = await getViewer();
   // Public deployments run on the owner's API key: limit per visitor, per IP and overall (admins exempt).
   if (!viewer.isAdmin) {
@@ -106,7 +107,7 @@ export async function POST(request: Request): Promise<Response> {
         const deadline = AbortSignal.timeout(RUN_DEADLINE_MS);
         const signal = AbortSignal.any([request.signal, deadline]);
         let activeAgent: string | null = null;
-        for await (const raw of runResearch({ query, depth, signal })) {
+        for await (const raw of runResearch({ query, depth, length, signal })) {
           if (raw.type === "agent_started") activeAgent = AGENT_LABELS[raw.agent];
           if (raw.type === "agent_completed") activeAgent = null;
           // Name the stage that ran out of time instead of a generic "aborted".

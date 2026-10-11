@@ -3,12 +3,12 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { emit } from "@/lib/events/emit";
 import type { ResearchStateType, ResearchStateUpdate } from "@/lib/graph/state";
 import { createModel, textOf, usageFrom } from "@/lib/llm";
-import type { Insight, Source } from "@/lib/schemas/domain";
+import type { Insight, ReportLength, Source } from "@/lib/schemas/domain";
 import { sourceNumber, toSummary } from "@/lib/schemas/domain";
 import { domainOf, renderSourceIndex } from "@/lib/agents/context";
 import { renderFindings } from "@/lib/agents/insight";
 
-const SYSTEM_PROMPT = `You are the Report Builder agent in a multi-agent research system. Write a rigorous, readable research report in GitHub-flavoured Markdown.
+const FULL_PROMPT = `You are the Report Builder agent in a multi-agent research system. Write a rigorous, readable research report in GitHub-flavoured Markdown.
 Use exactly these level-2 sections, in order:
 ## Summary
 ## Key Findings
@@ -20,6 +20,36 @@ Rules:
 - In Key Findings, use ### subheadings per theme and end each claim bullet with a status tag: {{Corroborated}}, {{Single-source}} or {{Disputed}}.
 - In Insights & Hypotheses, state each hypothesis with its confidence (High/Medium/Low) in bold.
 - Be concise, specific and neutral. No preamble before the first heading. Do not write Methodology or References sections — they are appended automatically.`;
+
+const COMMON_RULES = `- Cite sources inline with numbered brackets matching the source number, e.g. S3 is cited as [3]. Cite every factual claim. Never invent sources.
+- End each Key Findings bullet with a status tag: {{Corroborated}}, {{Single-source}} or {{Disputed}}.
+- Be specific and neutral. No preamble before the first heading. Do not write Methodology or References sections — they are appended automatically.`;
+
+const MEDIUM_PROMPT = `You are the Report Builder agent in a multi-agent research system. Write a concise research brief in GitHub-flavoured Markdown, about 250 words in total (excluding citations). Use exactly these level-2 sections, in order:
+## Summary
+## Key Findings
+## Contradictions & Open Questions
+## Insights & Hypotheses
+Rules:
+- Summary: 3 bullet points that directly answer the question.
+- Key Findings: 4–6 bullets, no subheadings.
+- Contradictions & Open Questions: 1–2 bullets. Insights & Hypotheses: 1–2 bullets, each with its confidence (High/Medium/Low) in bold.
+${COMMON_RULES}`;
+
+const SHORT_PROMPT = `You are the Report Builder agent in a multi-agent research system. Write a very short research brief in GitHub-flavoured Markdown, about 100 words in total (excluding citations). Use exactly these level-2 sections, in order:
+## Summary
+## Key Findings
+Rules:
+- Summary: 2–3 short bullet points that directly answer the question.
+- Key Findings: the 3 most important claims as bullets, no subheadings.
+${COMMON_RULES}`;
+
+/** Writing instructions and output budget per report length. */
+export const LENGTH_SETTINGS: Record<ReportLength, { prompt: string; maxTokens: number; methodology: boolean }> = {
+  short: { prompt: SHORT_PROMPT, maxTokens: 900, methodology: false },
+  medium: { prompt: MEDIUM_PROMPT, maxTokens: 1800, methodology: false },
+  full: { prompt: FULL_PROMPT, maxTokens: 5000, methodology: true },
+};
 
 function renderInsights(insights: Insight[]): string {
   return insights
@@ -99,10 +129,11 @@ export async function reporterAgent(
   const startedAt = Date.now();
   emit(config, { type: "agent_started", agent: "reporter", message: "Drafting the cited research report" });
 
-  const model = createModel({ maxTokens: 5000, timeoutMs: 90_000 });
+  const settings = LENGTH_SETTINGS[state.length ?? "full"];
+  const model = createModel({ maxTokens: settings.maxTokens, timeoutMs: 90_000 });
   const response = await model.invoke(
     [
-      new SystemMessage(SYSTEM_PROMPT),
+      new SystemMessage(settings.prompt),
       new HumanMessage(
         `# ${state.query}\n\n## Source index (cite S<n> as [n])\n${renderSourceIndex(state.sources)}\n\n${renderFindings(state.findings, state.contradictions)}\n\n## Insights\n${renderInsights(state.insights)}`,
       ),
@@ -119,9 +150,12 @@ export async function reporterAgent(
     notes.push(
       `${downgraded} claim label${downgraded > 1 ? "s" : ""} downgraded to Single-source (fewer than two cited sources).`,
     );
-  const report = [`# ${state.query}`, body, buildMethodology({ ...state, notes }), buildReferences(state.sources)].join(
-    "\n\n",
-  );
+  const report = [
+    `# ${state.query}`,
+    body,
+    ...(settings.methodology ? [buildMethodology({ ...state, notes })] : []),
+    buildReferences(state.sources),
+  ].join("\n\n");
 
   emit(config, { type: "usage", usage });
   emit(config, { type: "report_ready", report, sources: state.sources.map(toSummary) });

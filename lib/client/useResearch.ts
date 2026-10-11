@@ -6,7 +6,7 @@ import { isResearchEvent } from "@/lib/events/emit";
 import { createSseParser } from "@/lib/events/sse";
 import { stamp, type ResearchEvent } from "@/lib/events/types";
 import { isRecording, recordingPath, replayDelays } from "@/lib/demo/examples";
-import type { Depth } from "@/lib/schemas/domain";
+import type { Depth, ReportLength } from "@/lib/schemas/domain";
 
 /** Client-side cap slightly under the server's maxDuration. */
 const LIVE_TIMEOUT_MS = 290_000;
@@ -84,7 +84,13 @@ export function useResearch() {
   }, []);
 
   const runLive = useCallback(
-    async (query: string, depth: Depth, controller: AbortController, isCurrent: () => boolean) => {
+    async (
+      query: string,
+      depth: Depth,
+      length: ReportLength,
+      controller: AbortController,
+      isCurrent: () => boolean,
+    ) => {
       setMode("live");
       dispatch({ kind: "reset" });
       let timedOut = false;
@@ -99,7 +105,7 @@ export function useResearch() {
         const res = await fetch("/api/research", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, depth }),
+          body: JSON.stringify({ query, depth, length }),
           signal: controller.signal,
         });
         if (!res.ok || !res.body) {
@@ -145,14 +151,14 @@ export function useResearch() {
 
   /** Entry point: replays when demo mode is on and a recording exists, otherwise runs live. */
   const start = useCallback(
-    async (query: string, depth: Depth, preferReplay: boolean) => {
+    async (query: string, depth: Depth, preferReplay: boolean, length: ReportLength = "full") => {
       const { controller, isCurrent } = begin();
       if (preferReplay) {
         const recording = await loadRecording(query, controller.signal);
         if (!isCurrent()) return;
         if (recording) return playEvents(recording, isCurrent);
       }
-      return runLive(query, depth, controller, isCurrent);
+      return runLive(query, depth, length, controller, isCurrent);
     },
     [begin, playEvents, runLive],
   );

@@ -16,42 +16,39 @@ export function shareBullets(markdown: string, max = 3): string[] {
     .slice(0, max);
 }
 
-export interface ShareMessage {
-  subject: string;
-  /** Message text without the link. */
-  text: string;
-  /** Public report link, or the app's address when the report has no link. */
-  url: string;
+const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
+
+/**
+ * The 2–3 line description that opens a share message: the question, the
+ * headline findings, and a pointer to the attached files. Pure.
+ */
+export function shareDescription(query: string, markdown: string, appUrl: string): string {
+  let gist = shareBullets(markdown, 2).map(sentence).join(" ");
+  if (gist.length > 320) gist = `${gist.slice(0, 317).replace(/\s+\S*$/, "")}…`;
+  return [
+    `Research report: ${query}`,
+    ...(gist ? [gist] : []),
+    `Full cited report attached (PDF + interactive HTML). Researched with Lumen: ${appUrl}`,
+  ].join("\n");
 }
 
-export function buildShareMessage(query: string, markdown: string, url: string, isReportLink: boolean): ShareMessage {
-  const bullets = shareBullets(markdown);
-  const lines = [`"${query}"`];
-  if (bullets.length) lines.push("", "Key findings:", ...bullets.map((b) => `• ${b}`));
-  lines.push("", isReportLink ? "Full cited report from Lumen:" : "Researched with Lumen:");
-  return { subject: `Research report: ${query.slice(0, 90)}`, text: lines.join("\n"), url };
-}
+export const shareSubject = (query: string) => `Research report: ${query.slice(0, 90)}`;
 
-export type ShareTarget = "gmail" | "outlook" | "whatsapp" | "telegram" | "linkedin" | "x" | "email";
+export type ShareTarget = "gmail" | "outlook" | "whatsapp" | "telegram" | "email";
 
-/** Share-intent URL for each app. Pure. */
-export function shareHref(target: ShareTarget, m: ShareMessage): string {
+/** Compose URL for each app, pre-filled with the message (files are attached by the user). Pure. */
+export function shareHref(target: ShareTarget, subject: string, text: string, appUrl: string): string {
   const e = encodeURIComponent;
-  const full = `${m.text}\n${m.url}`;
   switch (target) {
     case "gmail":
-      return `https://mail.google.com/mail/?view=cm&fs=1&su=${e(m.subject)}&body=${e(full)}`;
+      return `https://mail.google.com/mail/?view=cm&fs=1&su=${e(subject)}&body=${e(text)}`;
     case "outlook":
-      return `https://outlook.live.com/mail/0/deeplink/compose?subject=${e(m.subject)}&body=${e(full)}`;
+      return `https://outlook.live.com/mail/0/deeplink/compose?subject=${e(subject)}&body=${e(text)}`;
     case "whatsapp":
-      return `https://wa.me/?text=${e(full)}`;
+      return `https://wa.me/?text=${e(text)}`;
     case "telegram":
-      return `https://t.me/share/url?url=${e(m.url)}&text=${e(m.text)}`;
-    case "linkedin":
-      return `https://www.linkedin.com/sharing/share-offsite/?url=${e(m.url)}`;
-    case "x":
-      return `https://twitter.com/intent/tweet?text=${e(`Research: ${m.subject.replace(/^Research report: /, "")}`)}&url=${e(m.url)}`;
+      return `https://t.me/share/url?url=${e(appUrl)}&text=${e(text)}`;
     case "email":
-      return `mailto:?subject=${e(m.subject)}&body=${e(full)}`;
+      return `mailto:?subject=${e(subject)}&body=${e(text)}`;
   }
 }

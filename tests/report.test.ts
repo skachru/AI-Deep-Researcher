@@ -157,15 +157,39 @@ describe("interactive HTML report", () => {
 });
 
 describe("share messages", () => {
-  it("shares plain key findings and a link through each app", async () => {
-    const { buildShareMessage, shareBullets, shareHref } = await import("@/lib/client/share");
+  it("opens with a 2–3 line description and pre-fills each app", async () => {
+    const { shareBullets, shareDescription, shareHref } = await import("@/lib/client/share");
     expect(shareBullets(sample)).toEqual(["Yes, mostly", "With caveats"]);
-    const m = buildShareMessage("Is X true?", sample, "https://lumen.app/share/abc", true);
-    expect(m.text).toContain("• Yes, mostly");
-    expect(m.text).not.toContain("{{");
-    expect(shareHref("whatsapp", m)).toMatch(/^https:\/\/wa\.me\/\?text=.*lumen\.app%2Fshare%2Fabc$/);
-    expect(shareHref("telegram", m)).toContain("t.me/share/url?url=https%3A%2F%2Flumen.app%2Fshare%2Fabc");
-    expect(shareHref("gmail", m)).toContain("mail.google.com/mail/?view=cm&fs=1&su=Research%20report");
-    expect(shareHref("email", m).startsWith("mailto:?subject=")).toBe(true);
+    const text = shareDescription("Is X true?", sample, "https://lumen.app");
+    expect(text.split("\n")).toEqual([
+      "Research report: Is X true?",
+      "Yes, mostly. With caveats.",
+      "Full cited report attached (PDF + interactive HTML). Researched with Lumen: https://lumen.app",
+    ]);
+    expect(shareHref("whatsapp", "S", text, "https://lumen.app")).toMatch(
+      /^https:\/\/wa\.me\/\?text=Research%20report/,
+    );
+    expect(shareHref("telegram", "S", text, "https://lumen.app")).toContain(
+      "t.me/share/url?url=https%3A%2F%2Flumen.app",
+    );
+    expect(shareHref("gmail", "S", text, "https://lumen.app")).toContain(
+      "mail.google.com/mail/?view=cm&fs=1&su=S&body=",
+    );
+    expect(shareHref("email", "S", text, "")).toMatch(/^mailto:\?subject=S&body=/);
+  });
+});
+
+describe("report length", () => {
+  it("parses the length option and sizes the writer for each", async () => {
+    const { parseReportLength, REPORT_LENGTHS } = await import("@/lib/schemas/domain");
+    const { LENGTH_SETTINGS } = await import("@/lib/agents/reporter");
+    expect(parseReportLength("short")).toBe("short");
+    expect(parseReportLength("bogus")).toBe("full");
+    expect(REPORT_LENGTHS.map((l) => l.label)).toEqual(["Short", "Medium", "Full length"]);
+    expect(REPORT_LENGTHS.some((l) => /\d/.test(l.label))).toBe(false);
+    expect(LENGTH_SETTINGS.short.prompt).toContain("about 100 words");
+    expect(LENGTH_SETTINGS.medium.prompt).toContain("about 250 words");
+    expect(LENGTH_SETTINGS.full.methodology).toBe(true);
+    expect(LENGTH_SETTINGS.short.methodology).toBe(false);
   });
 });

@@ -4,7 +4,7 @@ import { getServerEnv } from "@/lib/env";
 import { runQuickSummary } from "@/lib/agents/summary";
 import { buildResearchGraph } from "@/lib/graph/graph";
 import { loadModelInfo } from "@/lib/modelInfo";
-import type { Depth } from "@/lib/schemas/domain";
+import type { Depth, ReportLength } from "@/lib/schemas/domain";
 
 /** Parallel branches can fail together (AggregateError); surface the first real cause. Pure. */
 export function errorMessage(err: unknown): string {
@@ -17,6 +17,7 @@ export function errorMessage(err: unknown): string {
 export interface RunOptions {
   query: string;
   depth: Depth;
+  length?: ReportLength;
   signal?: AbortSignal;
 }
 
@@ -26,7 +27,12 @@ export interface RunOptions {
  * Errors become a final `error` event so consumers always get a well-formed
  * stream.
  */
-export async function* runResearch({ query, depth, signal }: RunOptions): AsyncGenerator<ResearchEvent> {
+export async function* runResearch({
+  query,
+  depth,
+  length = "full",
+  signal,
+}: RunOptions): AsyncGenerator<ResearchEvent> {
   yield stamp({ type: "run_started", query, depth });
 
   const queue: ResearchEvent[] = [];
@@ -57,7 +63,7 @@ export async function* runResearch({ query, depth, signal }: RunOptions): AsyncG
 
     const graphTask = (async () => {
       const graph = buildResearchGraph();
-      const stream = await graph.stream({ query, depth }, { streamMode: "custom", signal, recursionLimit: 12 });
+      const stream = await graph.stream({ query, depth, length }, { streamMode: "custom", signal, recursionLimit: 12 });
       for await (const chunk of stream) if (isResearchEvent(chunk)) push(chunk);
     })();
     let graphError: unknown = null;

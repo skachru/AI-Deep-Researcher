@@ -14,6 +14,17 @@ export const AGENT_LABELS: Record<AgentId, string> = {
 
 export type Depth = "quick" | "standard";
 
+/** How long the written report is. Shown to users only as Short / Medium / Full length. */
+export type ReportLength = "short" | "medium" | "full";
+export const REPORT_LENGTHS: { id: ReportLength; label: string }[] = [
+  { id: "short", label: "Short" },
+  { id: "medium", label: "Medium" },
+  { id: "full", label: "Full length" },
+];
+export function parseReportLength(v: unknown): ReportLength {
+  return v === "short" || v === "medium" ? v : "full";
+}
+
 export type SourceType = "web" | "news" | "paper" | "wiki";
 
 export interface Source {

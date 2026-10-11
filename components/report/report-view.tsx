@@ -155,14 +155,11 @@ export function ReportView({
   sources,
   query,
   searchId,
-  shareUrl,
 }: {
   report: string;
   sources: SourceSummary[];
   query: string;
   searchId: string | null;
-  /** Existing public link (on shared pages); otherwise one is created on demand. */
-  shareUrl?: string;
 }) {
   const ref = useMemo(() => ({ searchId, query, markdown: report, sources }), [searchId, query, report, sources]);
   const { body } = useMemo(() => splitReferences(report), [report]);
@@ -237,7 +234,7 @@ export function ReportView({
       <article className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-card">
         <ReportCover query={query} image={cover} sourceCount={sources.length} />
         <div className="px-6 pt-6 pb-10 sm:px-10">
-          <ReportActions report={ref} shareUrl={shareUrl} />
+          <ReportActions report={ref} />
           <ReliabilityPanel data={reliability} className="mt-6" />
           <div className="prose-report mt-2">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>

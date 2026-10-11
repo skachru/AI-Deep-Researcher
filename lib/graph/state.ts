@@ -6,6 +6,7 @@ import type {
   Finding,
   Gap,
   Insight,
+  ReportLength,
   Source,
   SubQuestion,
   Usage,
@@ -30,6 +31,7 @@ const replace = <T>(_current: T, update: T): T => update;
 export const ResearchState = Annotation.Root({
   query: Annotation<string>(),
   depth: Annotation<Depth>({ reducer: replace, default: () => "quick" }),
+  length: Annotation<ReportLength>({ reducer: replace, default: () => "full" }),
   subQuestions: Annotation<SubQuestion[]>({ reducer: append, default: () => [] }),
   sources: Annotation<Source[]>({
     // Credibility updates arrive as full replacements of existing ids; new ids are appended.

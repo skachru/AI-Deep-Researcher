@@ -69,13 +69,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ t
           </Button>
         </div>
       </div>
-      <ReportView
-        report={shared.report}
-        sources={shared.sources}
-        query={shared.query}
-        searchId={null}
-        shareUrl={`/share/${shared.shareId}`}
-      />
+      <ReportView report={shared.report} sources={shared.sources} query={shared.query} searchId={null} />
     </div>
   );
 }

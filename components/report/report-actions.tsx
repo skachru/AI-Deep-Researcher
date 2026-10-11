@@ -37,7 +37,7 @@ function refBody(ref: ReportRef) {
   return { searchId: ref.searchId, query: ref.query, markdown: ref.markdown, sources };
 }
 
-function saveBlob(blob: Blob, filename: string) {
+export function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -52,7 +52,7 @@ async function errorFrom(res: Response): Promise<string> {
   return typeof msg === "string" ? msg : `Request failed (${res.status})`;
 }
 
-async function fetchExport(report: ReportRef, format: "html" | "pdf"): Promise<Blob> {
+export async function fetchExport(report: ReportRef, format: "html" | "pdf"): Promise<Blob> {
   const res = await fetch("/api/export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -93,7 +93,7 @@ async function printReport(report: ReportRef): Promise<void> {
   win.print();
 }
 
-export function ReportActions({ report, shareUrl }: { report: ReportRef; shareUrl?: string }) {
+export function ReportActions({ report }: { report: ReportRef }) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<"html" | "pdf" | "print" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +121,7 @@ export function ReportActions({ report, shareUrl }: { report: ReportRef; shareUr
   return (
     <div className="flex flex-col items-end gap-1.5 print:hidden">
       <div className="flex items-center justify-end gap-2">
-        <ShareMenu report={report} presetUrl={shareUrl} />
+        <ShareMenu report={report} />
         <Button size="sm" onClick={() => run("print")} disabled={busy !== null} aria-label="Print report">
           {busy === "print" ? <Loader2 className="animate-spin" /> : <Printer />}
           <span className="hidden sm:inline">Print</span>

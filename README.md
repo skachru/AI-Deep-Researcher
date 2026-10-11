@@ -100,10 +100,13 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
   rendered server-side with pdfmake). The HTML (`lib/report/interactive.ts`) is a self-contained page with key takeaways,
   an evidence ring, claim filters, citation previews that jump to the source, source filters, dark mode and print; all
   report text is sanitised because it derives from web content. **Print** prints that designed report, not the app.
-- **Share:** the Share menu creates an unlisted link (`POST /api/share`, random id) to a read-only copy of a saved report
-  at `/share/<id>`, with link previews, and opens it in WhatsApp, Gmail, Telegram, LinkedIn, X, Outlook, the email app or
-  the phone's share sheet. Without a database the key findings are shared as text instead. (`POST /api/email` still
-  exists for SMTP delivery but is no longer shown in the UI.)
+- **Report length:** Short, Medium or Full length next to Quick/Standard. Short and Medium ask the Report Builder for a
+  brief of roughly 100 or 250 words (Summary and Key Findings, plus brief Contradictions and Insights for Medium) and
+  skip the Methodology section; References are always included.
+- **Share:** opens with an editable 2–3 line description and attaches the report as PDF and interactive HTML. Where the
+  browser can share files (phones, most desktops), the system share sheet sends both to WhatsApp, Gmail, Telegram and
+  others. Otherwise the files are downloaded and the chosen app opens with the description filled in, ready to attach.
+  Links shared by earlier versions (`/share/<id>`) still open.
 - **Admin:** `/admin` (only for `ADMIN_EMAILS`) shows searches, success rate, users, average run time, tokens, emails sent,
   searches per day, top questions and recent searches.
 

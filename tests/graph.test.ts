@@ -170,6 +170,16 @@ describe("research graph", () => {
     expect(events.filter((e) => e.type === "summary_delta")).toHaveLength(2);
   });
 
+  it("passes the chosen report length to the Report Builder (no Methodology in short reports)", async () => {
+    const { runResearch } = await import("@/lib/graph/run");
+    const events: ResearchEvent[] = [];
+    for await (const e of runResearch({ query: "Do AI coding assistants help?", depth: "quick", length: "short" }))
+      events.push(e);
+    const ready = events.find((e) => e.type === "report_ready");
+    expect(ready?.type === "report_ready" && ready.report).toContain("## References");
+    expect(ready?.type === "report_ready" && ready.report).not.toContain("## Methodology");
+  });
+
   it("runs all four agents, loops once for an important gap and produces a cited report", async () => {
     const { runResearch } = await import("@/lib/graph/run");
     const events: ResearchEvent[] = [];

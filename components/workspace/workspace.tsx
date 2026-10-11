@@ -14,7 +14,7 @@ import { QuickSummary } from "@/components/workspace/quick-summary";
 import { SideTabs } from "@/components/workspace/side-tabs";
 import { Timeline } from "@/components/workspace/timeline";
 import { useResearch } from "@/lib/client/useResearch";
-import type { Depth } from "@/lib/schemas/domain";
+import type { Depth, ReportLength } from "@/lib/schemas/domain";
 import { formatDuration, formatTokens } from "@/lib/utils";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
@@ -40,20 +40,30 @@ function useElapsed(startedAt: number | null, finishedAt: number | null) {
   return (finishedAt ?? now) - startedAt;
 }
 
-export function Workspace({ query, depth, replay }: { query: string; depth: Depth; replay: boolean }) {
+export function Workspace({
+  query,
+  depth,
+  length,
+  replay,
+}: {
+  query: string;
+  depth: Depth;
+  length: ReportLength;
+  replay: boolean;
+}) {
   const { state, mode, start, stop } = useResearch();
   const [view, setView] = useState<"workspace" | "report">("workspace");
   const elapsed = useElapsed(state.startedAt, state.finishedAt);
 
   // Start on mount; abort the stream on unmount (also keeps React Strict Mode's double-mount clean).
   useEffect(() => {
-    void start(query, depth, DEMO_MODE || replay);
+    void start(query, depth, DEMO_MODE || replay, length);
     return stop;
-  }, [query, depth, replay, start, stop]);
+  }, [query, depth, length, replay, start, stop]);
 
   const restart = () => {
     setView("workspace");
-    void start(query, depth, false);
+    void start(query, depth, false, length);
   };
 
   const statusBadge =
