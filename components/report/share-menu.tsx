@@ -2,7 +2,7 @@
 
 import { Check, Download, FileText, Globe, Loader2, Mail, MessageCircle, Send, Share2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchExport, type ReportRef, saveBlob } from "@/components/report/report-actions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -129,18 +129,17 @@ export function ShareMenu({ report }: { report: ReportRef }) {
 
   // An app opened before the files were ready gets them as soon as they are.
   const [pendingDownload, setPendingDownload] = useState(false);
+  const downloadFiles = useCallback(() => {
+    if (!ready || downloaded) return; // once per opening of the menu
+    ready.forEach((f, i) => setTimeout(() => saveBlob(f, f.name), i * 400));
+    setDownloaded(true);
+  }, [ready, downloaded]);
   useEffect(() => {
     if (pendingDownload && ready) {
       setPendingDownload(false);
       downloadFiles();
     }
-  });
-
-  const downloadFiles = () => {
-    if (!ready || downloaded) return; // once per opening of the menu
-    ready.forEach((f, i) => setTimeout(() => saveBlob(f, f.name), i * 400));
-    setDownloaded(true);
-  };
+  }, [pendingDownload, ready, downloadFiles]);
 
   const emailDraft = async () => {
     if (!ready) return;
