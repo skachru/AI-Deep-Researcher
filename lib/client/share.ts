@@ -16,19 +16,22 @@ export function shareBullets(markdown: string, max = 3): string[] {
     .slice(0, max);
 }
 
-const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
-
 /**
- * The 2–3 line description that opens a share message: the question, the
- * headline findings, and a pointer to the attached files. Pure.
+ * The default share message: a greeting, what the report is and how it was
+ * made, the headline findings, what's attached, and a sign-off. Pure.
  */
-export function shareDescription(query: string, markdown: string, appUrl: string): string {
-  let gist = shareBullets(markdown, 2).map(sentence).join(" ");
-  if (gist.length > 320) gist = `${gist.slice(0, 317).replace(/\s+\S*$/, "")}…`;
+export function shareDescription(query: string, markdown: string, appUrl: string, senderName?: string | null): string {
+  const findings = shareBullets(markdown, 2);
   return [
-    `Research report: ${query}`,
-    ...(gist ? [gist] : []),
-    `Full cited report attached (PDF + interactive HTML). Researched with Lumen: ${appUrl}`,
+    "Hi,",
+    "",
+    `I wanted to share a research report on "${query}". It was prepared with Lumen (${appUrl}), an AI research assistant that cross-checks each claim against multiple sources and cites them.`,
+    ...(findings.length ? ["", "Headline findings:", ...findings.map((f) => `• ${f}`)] : []),
+    "",
+    "The full report is attached as a PDF, along with an interactive HTML version you can open in any browser.",
+    "",
+    "Best regards,",
+    ...(senderName ? [senderName] : []),
   ].join("\n");
 }
 
@@ -51,4 +54,54 @@ export function shareHref(target: ShareTarget, subject: string, text: string, ap
     case "email":
       return `mailto:?subject=${e(subject)}&body=${e(text)}`;
   }
+}
+
+export interface Attachment {
+  name: string;
+  type: string;
+  /** File content, base64-encoded. */
+  base64: string;
+}
+
+const encodeHeader = (v: string) =>
+  /^[\x20-\x7e]*$/.test(v) ? v : `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(v)))}?=`;
+const wrap76 = (b64: string) => b64.replace(/.{1,76}/g, "$&\r\n").trimEnd();
+
+/**
+ * An unsent email draft (.eml) with the files attached. Desktop mail apps
+ * (Outlook, Apple Mail, Thunderbird) open it ready to address and send. Pure.
+ */
+export function buildEmlDraft(
+  subject: string,
+  text: string,
+  attachments: Attachment[],
+  boundary = "lumen-boundary",
+): string {
+  const utf8 = btoa(String.fromCharCode(...new TextEncoder().encode(text.replace(/\r?\n/g, "\r\n"))));
+  const parts = [
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrap76(utf8),
+    ...attachments.flatMap((a) => [
+      `--${boundary}`,
+      `Content-Type: ${a.type}; name="${a.name}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${a.name}"`,
+      "",
+      wrap76(a.base64),
+    ]),
+    `--${boundary}--`,
+    "",
+  ];
+  return [
+    "X-Unsent: 1",
+    "To: ",
+    `Subject: ${encodeHeader(subject)}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    ...parts,
+  ].join("\r\n");
 }

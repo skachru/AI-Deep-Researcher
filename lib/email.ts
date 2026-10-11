@@ -13,6 +13,9 @@ export interface Mail {
   subject: string;
   html: string;
   text: string;
+  /** Display name for the From header (the address is always the configured sender). */
+  fromName?: string;
+  replyTo?: string;
   attachments?: { filename: string; content: Buffer | string; contentType: string }[];
 }
 
@@ -25,9 +28,12 @@ export async function sendMail(mail: Mail): Promise<void> {
     secure: port === 465,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
+  const { fromName, ...rest } = mail;
+  const from = process.env.EMAIL_FROM ?? `Lumen Research <${process.env.SMTP_USER}>`;
+  const address = from.match(/<([^>]+)>/)?.[1] ?? from;
   await transport.sendMail({
-    from: process.env.EMAIL_FROM ?? `Lumen Research <${process.env.SMTP_USER}>`,
-    ...mail,
+    from: fromName ? { name: fromName, address } : from,
+    ...rest,
   });
 }
 

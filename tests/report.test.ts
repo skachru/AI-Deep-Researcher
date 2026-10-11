@@ -157,25 +157,38 @@ describe("interactive HTML report", () => {
 });
 
 describe("share messages", () => {
-  it("opens with a 2–3 line description and pre-fills each app", async () => {
-    const { shareBullets, shareDescription, shareHref } = await import("@/lib/client/share");
-    expect(shareBullets(sample)).toEqual(["Yes, mostly", "With caveats"]);
-    const text = shareDescription("Is X true?", sample, "https://lumen.app");
-    expect(text.split("\n")).toEqual([
-      "Research report: Is X true?",
-      "Yes, mostly. With caveats.",
-      "Full cited report attached (PDF + interactive HTML). Researched with Lumen: https://lumen.app",
+  it("opens with a greeting and context, then the findings, attachments and sign-off", async () => {
+    const { shareDescription, shareHref } = await import("@/lib/client/share");
+    const text = shareDescription("Is X true?", sample, "https://lumen.app", "Saurabh");
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("Hi,");
+    expect(lines[2]).toContain('I wanted to share a research report on "Is X true?"');
+    expect(text).toContain("• Yes, mostly\n• With caveats");
+    expect(text).toContain("attached as a PDF, along with an interactive HTML version");
+    expect(lines.slice(-2)).toEqual(["Best regards,", "Saurabh"]);
+    expect(shareDescription("q", sample, "u").endsWith("Best regards,")).toBe(true);
+    expect(shareHref("whatsapp", "S", text, "https://lumen.app")).toMatch(/^https:\/\/wa\.me\/\?text=Hi%2C/);
+    expect(shareHref("gmail", "S", text, "")).toContain("mail.google.com/mail/?view=cm&fs=1&su=S&body=");
+  });
+
+  it("builds an unsent email draft with both files attached", async () => {
+    const { buildEmlDraft } = await import("@/lib/client/share");
+    const eml = buildEmlDraft("Research report: café", "Hi,\nthere", [
+      { name: "r.pdf", type: "application/pdf", base64: "JVBERi0=" },
+      { name: "r.html", type: "text/html", base64: "PGgxPg==" },
     ]);
-    expect(shareHref("whatsapp", "S", text, "https://lumen.app")).toMatch(
-      /^https:\/\/wa\.me\/\?text=Research%20report/,
-    );
-    expect(shareHref("telegram", "S", text, "https://lumen.app")).toContain(
-      "t.me/share/url?url=https%3A%2F%2Flumen.app",
-    );
-    expect(shareHref("gmail", "S", text, "https://lumen.app")).toContain(
-      "mail.google.com/mail/?view=cm&fs=1&su=S&body=",
-    );
-    expect(shareHref("email", "S", text, "")).toMatch(/^mailto:\?subject=S&body=/);
+    expect(eml.startsWith("X-Unsent: 1\r\n")).toBe(true);
+    expect(eml).toContain("Subject: =?UTF-8?B?");
+    expect(eml).toContain('Content-Disposition: attachment; filename="r.pdf"');
+    expect(eml).toContain('Content-Disposition: attachment; filename="r.html"');
+    expect(eml.trimEnd().endsWith("--lumen-boundary--")).toBe(true);
+  });
+
+  it("renders the emailed message safely", async () => {
+    const { messageHtml } = await import("@/lib/report/share-email");
+    const html = messageHtml("Hi <b>you</b>\nSee https://lumen.app", "a@b.com");
+    expect(html).toContain('Hi &lt;b&gt;you&lt;/b&gt;<br>See <a href="https://lumen.app"');
+    expect(html).toContain("Sent via Lumen by a@b.com");
   });
 });
 

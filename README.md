@@ -103,10 +103,12 @@ Variables are validated with Zod on first use (`lib/env.ts`), so a missing key p
 - **Report length:** Short, Medium or Full length next to Quick/Standard. Short and Medium ask the Report Builder for a
   brief of roughly 100 or 250 words (Summary and Key Findings, plus brief Contradictions and Insights for Medium) and
   skip the Methodology section; References are always included.
-- **Share:** opens with an editable 2–3 line description and attaches the report as PDF and interactive HTML. Where the
-  browser can share files (phones, most desktops), the system share sheet sends both to WhatsApp, Gmail, Telegram and
-  others. Otherwise the files are downloaded and the chosen app opens with the description filled in, ready to attach.
-  Links shared by earlier versions (`/share/<id>`) still open.
+- **Share:** opens with an editable message (greeting, context, headline findings, sign-off) and the report as PDF and
+  interactive HTML. Files are truly attached in three ways: **Send by email** (signed-in users; Lumen sends it over SMTP
+  with both files, Reply-To the sender; `POST /api/email`, max 5 recipients, rate-limited), the system **share sheet**
+  where the browser can share files, and **Email app**, which saves an unsent `.eml` draft with both files for Outlook,
+  Apple Mail or Thunderbird. WhatsApp, Telegram, Gmail and Outlook web compose links only carry text, so for those the
+  files are downloaded to attach by hand. Links shared by earlier versions (`/share/<id>`) still open.
 - **Admin:** `/admin` (only for `ADMIN_EMAILS`) shows searches, success rate, users, average run time, tokens, emails sent,
   searches per day, top questions and recent searches.
 
