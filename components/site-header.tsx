@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/home/hero-art";
 import { AccountNav } from "@/components/account-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -6,9 +7,7 @@ import { cn } from "@/lib/utils";
 function Logo({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn("flex items-center gap-2 text-[14px] font-semibold tracking-tight", className)}>
-      <span className="grid size-6 place-items-center rounded-md bg-accent text-[12px] font-bold text-accent-foreground shadow-card">
-        L
-      </span>
+      <LogoMark className="size-7" />
       Lumen
     </Link>
   );

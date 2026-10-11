@@ -16,17 +16,19 @@ export default function HomePage() {
     <div className="relative isolate min-h-dvh">
       <HeroBackdrop />
       <SiteHeader />
-      <main className="mx-auto flex max-w-3xl flex-col items-center px-4 pt-14 pb-20 sm:pt-20">
-        <HeroOrb className="size-24 sm:size-28" />
-        <h1 className="mt-4 text-center text-[40px] font-semibold tracking-[-0.035em] sm:text-[52px]">Lumen</h1>
-        <p className="mt-2 max-w-2xl text-center text-[19px] leading-snug font-medium tracking-[-0.01em] text-foreground/85 sm:text-[22px]">
+      <main className="mx-auto flex max-w-3xl flex-col items-center px-4 pt-8 pb-20 sm:pt-12">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <HeroOrb className="size-16 sm:size-20" />
+          <h1 className="text-[40px] font-semibold tracking-[-0.035em] sm:text-[52px]">Lumen</h1>
+        </div>
+        <p className="mt-3 max-w-2xl text-center text-[19px] leading-snug font-medium tracking-[-0.01em] text-foreground/85 sm:text-[22px]">
           Every claim cross-checked. Every source cited.{" "}
           <span className="block bg-gradient-to-r from-accent to-[#9b6ad2] bg-clip-text text-transparent">
             Research you can trust.
           </span>
         </p>
 
-        <div className="mt-10 w-full">
+        <div className="mt-7 w-full">
           <QueryForm />
         </div>
 

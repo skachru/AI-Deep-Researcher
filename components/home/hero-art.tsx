@@ -5,12 +5,8 @@
 export function HeroOrb({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 160 160" className={className} aria-hidden>
+      <OrbCoreGradient id="orb-core" />
       <defs>
-        <radialGradient id="orb-core" cx="50%" cy="45%" r="55%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="45%" stopColor="#a5acf0" />
-          <stop offset="100%" stopColor="#5e6ad2" />
-        </radialGradient>
         <radialGradient id="orb-glow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#5e6ad2" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#5e6ad2" stopOpacity="0" />
@@ -33,6 +29,52 @@ export function HeroOrb({ className }: { className?: string }) {
             fill="none"
             stroke="var(--success)"
             strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function OrbCoreGradient({ id }: { id: string }) {
+  return (
+    <defs>
+      <radialGradient id={id} cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="45%" stopColor="#a5acf0" />
+        <stop offset="100%" stopColor="#5e6ad2" />
+      </radialGradient>
+    </defs>
+  );
+}
+
+const NODES = [
+  [80, 26],
+  [134, 80],
+  [80, 134],
+  [26, 80],
+];
+
+/**
+ * The orb as a compact brand mark for the header: same design, with bigger
+ * nodes and bolder strokes so the ticks stay legible at 28px.
+ */
+export function LogoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="8 8 144 144" className={className} aria-hidden>
+      <OrbCoreGradient id="logo-core" />
+      <circle cx="80" cy="80" r="54" fill="none" stroke="var(--accent)" strokeOpacity="0.45" strokeWidth="4" />
+      <circle cx="80" cy="80" r="32" fill="url(#logo-core)" />
+      {NODES.map(([x, y], i) => (
+        <g key={i}>
+          <circle cx={x} cy={y} r="17" fill="var(--surface)" stroke="var(--accent)" strokeWidth="4" />
+          <path
+            d={`M${x - 7} ${y} l5 5 l9 -10`}
+            fill="none"
+            stroke="var(--success)"
+            strokeWidth="5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
